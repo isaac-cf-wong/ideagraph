@@ -6,7 +6,16 @@ This package holds the primary domain model. The first citizen is the
 
 from __future__ import annotations
 
+from claimkit.core.activity import Activity, ActivityKind
 from claimkit.core.claim import Claim, ClaimStatus
 from claimkit.core.evidence import Evidence, EvidenceKind, EvidenceRelation
 
-__all__ = ["Claim", "ClaimStatus", "Evidence", "EvidenceKind", "EvidenceRelation"]
+__all__ = [
+    "Activity",
+    "ActivityKind",
+    "Claim",
+    "ClaimStatus",
+    "Evidence",
+    "EvidenceKind",
+    "EvidenceRelation",
+]
