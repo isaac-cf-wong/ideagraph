@@ -87,6 +87,7 @@ def register_commands() -> None:
     from claimkit.cli.add_claim import add_claim_command
     from claimkit.cli.add_evidence import add_evidence_command
     from claimkit.cli.export import export_command
+    from claimkit.cli.import_prov import import_command
     from claimkit.cli.init import init_command
     from claimkit.cli.report import report_command
     from claimkit.cli.validate import validate_command
@@ -97,6 +98,7 @@ def register_commands() -> None:
     app.command(name="validate")(validate_command)
     app.command(name="report")(report_command)
     app.command(name="export")(export_command)
+    app.command(name="import")(import_command)
 
 
 register_commands()
