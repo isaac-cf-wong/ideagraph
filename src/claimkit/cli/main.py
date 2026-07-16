@@ -83,10 +83,12 @@ def main(
 
 
 def register_commands() -> None:
-    """Register CLI commands.
+    """Register CLI commands."""
+    from claimkit.cli.report import report_command
+    from claimkit.cli.validate import validate_command
 
-    No subcommands are wired up yet; commands are added here as the CLI grows.
-    """
+    app.command(name="validate")(validate_command)
+    app.command(name="report")(report_command)
 
 
 register_commands()
