@@ -15,12 +15,17 @@ from claimkit.core import (
     ProvenanceGraph,
     ProvenancePredicate,
     ProvenanceRelation,
+    ValidationResult,
+    apply_all,
+    apply_validation,
     compute_digest,
     evidence_changed,
     find_stale_claims,
     find_stale_evidence,
     hash_file,
     mark_stale_claims,
+    validate_all,
+    validate_claim,
 )
 from claimkit.hello_world import goodbye_world, hello_goodbye, hello_world, say_goodbye, say_hello
 from claimkit.version import __version__
@@ -38,7 +43,10 @@ __all__ = [
     "ProvenanceGraph",
     "ProvenancePredicate",
     "ProvenanceRelation",
+    "ValidationResult",
     "__version__",
+    "apply_all",
+    "apply_validation",
     "compute_digest",
     "evidence_changed",
     "find_stale_claims",
@@ -50,4 +58,6 @@ __all__ = [
     "mark_stale_claims",
     "say_goodbye",
     "say_hello",
+    "validate_all",
+    "validate_claim",
 ]

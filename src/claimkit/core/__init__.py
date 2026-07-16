@@ -20,6 +20,13 @@ from claimkit.core.staleness import (
     hash_file,
     mark_stale_claims,
 )
+from claimkit.core.validation import (
+    ValidationResult,
+    apply_all,
+    apply_validation,
+    validate_all,
+    validate_claim,
+)
 
 __all__ = [
     "Activity",
@@ -34,10 +41,15 @@ __all__ = [
     "ProvenanceGraph",
     "ProvenancePredicate",
     "ProvenanceRelation",
+    "ValidationResult",
+    "apply_all",
+    "apply_validation",
     "compute_digest",
     "evidence_changed",
     "find_stale_claims",
     "find_stale_evidence",
     "hash_file",
     "mark_stale_claims",
+    "validate_all",
+    "validate_claim",
 ]
