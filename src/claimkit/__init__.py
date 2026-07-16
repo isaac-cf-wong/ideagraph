@@ -28,6 +28,7 @@ from claimkit.core import (
     validate_claim,
 )
 from claimkit.hello_world import goodbye_world, hello_goodbye, hello_world, say_goodbye, say_hello
+from claimkit.reporting import render_claim_report, render_report
 from claimkit.version import __version__
 
 __all__ = [
@@ -56,6 +57,8 @@ __all__ = [
     "hello_goodbye",
     "hello_world",
     "mark_stale_claims",
+    "render_claim_report",
+    "render_report",
     "say_goodbye",
     "say_hello",
     "validate_all",
