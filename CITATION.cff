@@ -1,14 +1,18 @@
 cff-version: 1.2.0
-title:
-    'python-package-template: A GitHub template repository for a Python package'
-license: 'BSD'
+title: 'ClaimKit: A claim-level provenance framework for scientific research'
+message: 'If you use this software, please cite it using these metadata.'
+license: BSD-3-Clause
 type: software
 authors:
     - given-names: Isaac C. F.
       family-names: Wong
       affiliation: KU Leuven
       orcid: 'https://orcid.org/0000-0003-2166-0027'
+repository-code: 'https://github.com/isaac-cf-wong/claimkit'
+url: 'https://isaac-cf-wong.github.io/claimkit/'
 keywords:
-    - python
-    - github
-    - template
+    - provenance
+    - reproducibility
+    - scientific-research
+    - claims
+    - agent-friendly
