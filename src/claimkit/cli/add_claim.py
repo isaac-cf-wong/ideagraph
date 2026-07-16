@@ -8,6 +8,8 @@ from typing import Annotated
 
 import typer
 
+from claimkit.core import ClaimStatus
+
 
 def add_claim_command(
     path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
@@ -20,6 +22,14 @@ def add_claim_command(
         list[str] | None,
         typer.Option("--tag", help="A tag for the claim. Repeatable."),
     ] = None,
+    status: Annotated[
+        ClaimStatus,
+        typer.Option("--status", help="Initial claim status."),
+    ] = ClaimStatus.UNRESOLVED,
+    meta: Annotated[
+        list[str] | None,
+        typer.Option("--meta", help="A KEY=VALUE metadata entry. Repeatable."),
+    ] = None,
 ) -> None:
     """Add a claim to a provenance graph and print its id.
 
@@ -28,9 +38,12 @@ def add_claim_command(
         statement: The human-readable claim statement.
         claim_id: An explicit id for the claim, or None to generate one.
         tags: Tags to attach to the claim.
+        status: The initial status to set on the claim.
+        meta: Repeatable ``KEY=VALUE`` metadata entries.
     """
     from logging import getLogger
 
+    from claimkit.cli._options import parse_meta
     from claimkit.core import Claim
     from claimkit.persistence import load_graph, save_graph
 
@@ -47,10 +60,11 @@ def add_claim_command(
         raise typer.Exit(code=1)
 
     claim_tags = list(tags) if tags else []
+    claim_meta = parse_meta(meta)
     claim = (
-        Claim(statement=statement, tags=claim_tags)
+        Claim(statement=statement, tags=claim_tags, status=status, metadata=claim_meta)
         if claim_id is None
-        else Claim(statement=statement, id=claim_id, tags=claim_tags)
+        else Claim(statement=statement, id=claim_id, tags=claim_tags, status=status, metadata=claim_meta)
     )
     graph.add_claim(claim)
     save_graph(graph, path)
