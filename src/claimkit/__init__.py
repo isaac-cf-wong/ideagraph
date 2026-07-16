@@ -36,7 +36,7 @@ from claimkit.persistence import (
     loads_graph,
     save_graph,
 )
-from claimkit.prov import dumps_prov, to_prov
+from claimkit.prov import dumps_prov, from_prov, loads_prov, to_prov
 from claimkit.reporting import render_claim_report, render_report
 from claimkit.version import __version__
 
@@ -64,11 +64,13 @@ __all__ = [
     "evidence_changed",
     "find_stale_claims",
     "find_stale_evidence",
+    "from_prov",
     "graph_from_document",
     "graph_to_document",
     "hash_file",
     "load_graph",
     "loads_graph",
+    "loads_prov",
     "mark_stale_claims",
     "render_claim_report",
     "render_report",

@@ -23,13 +23,25 @@ All identifiers are emitted as qualified names in the ``ck`` namespace.
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from typing import Any
 
+from claimkit.core.activity import Activity, ActivityKind
+from claimkit.core.claim import Claim, ClaimStatus
+from claimkit.core.evidence import Evidence, EvidenceKind, EvidenceRelation
 from claimkit.core.graph import ProvenanceGraph
-from claimkit.core.provenance import NodeType, ProvenancePredicate
+from claimkit.core.provenance import NodeType, ProvenancePredicate, ProvenanceRelation
 
 #: Namespace prefix mapping emitted in the PROV-JSON document.
 CK_NAMESPACE = "https://claimkit.dev/ns#"
+
+#: Reverse of the supports/refutes/contextual -> predicate mapping, used to
+#: recover an evidence's intrinsic relation from the edge that links it.
+_PREDICATE_TO_RELATION = {
+    ProvenancePredicate.SUPPORTED_BY: EvidenceRelation.SUPPORTS,
+    ProvenancePredicate.REFUTED_BY: EvidenceRelation.REFUTES,
+    ProvenancePredicate.RELATES_TO: EvidenceRelation.CONTEXTUAL,
+}
 
 
 def _qn(identifier: str) -> str:
@@ -158,3 +170,179 @@ def dumps_prov(graph: ProvenanceGraph, *, indent: int = 2) -> str:
 
     """
     return json.dumps(to_prov(graph), indent=indent, ensure_ascii=False)
+
+
+def _local(qualified_name: str) -> str:
+    """Strip the ``ck:`` prefix from a qualified name.
+
+    Args:
+        qualified_name: A PROV-JSON qualified name.
+
+    Returns:
+        The bare local identifier; names in other namespaces are returned
+        unchanged.
+
+    """
+    return qualified_name[3:] if qualified_name.startswith("ck:") else qualified_name
+
+
+# How each PROV relation container names its subject/object roles and which
+# claimkit predicate it represents. ``wasInfluencedBy`` is handled separately
+# because its predicate is carried in a ``ck:predicate`` attribute.
+_RELATION_ROLES = {
+    "used": ("prov:activity", "prov:entity", ProvenancePredicate.USED),
+    "wasGeneratedBy": ("prov:entity", "prov:activity", ProvenancePredicate.GENERATED_BY),
+    "wasDerivedFrom": ("prov:generatedEntity", "prov:usedEntity", ProvenancePredicate.DERIVED_FROM),
+    "wasAttributedTo": ("prov:entity", "prov:agent", ProvenancePredicate.ATTRIBUTED_TO),
+}
+
+
+def _node_type_map(entities: dict[str, Any], activities: dict[str, Any], agents: dict[str, Any]) -> dict[str, NodeType]:
+    """Map every qualified name in a document to its claimkit NodeType.
+
+    Args:
+        entities: The document's ``entity`` collection.
+        activities: The document's ``activity`` collection.
+        agents: The document's ``agent`` collection.
+
+    Returns:
+        A mapping from qualified name to :class:`NodeType`.
+
+    """
+    entity_types = {"ck:Claim": NodeType.CLAIM, "ck:Evidence": NodeType.EVIDENCE}
+    node_types: dict[str, NodeType] = {
+        qn: entity_types.get(attrs.get("prov:type"), NodeType.ARTEFACT) for qn, attrs in entities.items()
+    }
+    node_types.update(dict.fromkeys(activities, NodeType.ACTIVITY))
+    node_types.update(dict.fromkeys(agents, NodeType.AGENT))
+    return node_types
+
+
+def _import_nodes(graph: ProvenanceGraph, entities: dict[str, Any], activities: dict[str, Any]) -> None:
+    """Add claim, evidence, and activity nodes to a graph from PROV collections.
+
+    Args:
+        graph: The graph to populate.
+        entities: The document's ``entity`` collection.
+        activities: The document's ``activity`` collection.
+
+    """
+    for qn, attrs in entities.items():
+        prov_type = attrs.get("prov:type")
+        if prov_type == "ck:Claim":
+            graph.add_claim(
+                Claim(
+                    statement=attrs.get("ck:statement", ""),
+                    id=_local(qn),
+                    status=ClaimStatus(attrs.get("ck:status", ClaimStatus.UNRESOLVED.value)),
+                )
+            )
+        elif prov_type == "ck:Evidence":
+            graph.add_evidence(
+                Evidence(
+                    claim_id="",
+                    kind=EvidenceKind(attrs.get("ck:kind", EvidenceKind.OTHER.value)),
+                    reference=attrs.get("ck:reference", ""),
+                    id=_local(qn),
+                    digest=attrs.get("ck:digest"),
+                )
+            )
+    for qn, attrs in activities.items():
+        activity = Activity(kind=ActivityKind.OTHER, label=attrs.get("prov:label", ""), id=_local(qn))
+        if attrs.get("prov:startTime") is not None:
+            activity.started_at = datetime.fromisoformat(attrs["prov:startTime"])
+        if attrs.get("prov:endTime") is not None:
+            activity.ended_at = datetime.fromisoformat(attrs["prov:endTime"])
+        graph.add_activity(activity)
+
+
+def _import_edges(graph: ProvenanceGraph, document: dict[str, Any], node_types: dict[str, NodeType]) -> None:
+    """Add provenance edges to a graph from a document's relation collections.
+
+    Args:
+        graph: The graph to populate.
+        document: The full PROV-JSON document.
+        node_types: Mapping from qualified name to :class:`NodeType`.
+
+    """
+
+    def _add(subject_qn: str, predicate: ProvenancePredicate, object_qn: str, edge_qn: str) -> None:
+        graph.add_relation(
+            ProvenanceRelation(
+                subject_type=node_types.get(subject_qn, NodeType.ARTEFACT),
+                subject_id=_local(subject_qn),
+                predicate=predicate,
+                object_type=node_types.get(object_qn, NodeType.ARTEFACT),
+                object_id=_local(object_qn),
+                id=_local(edge_qn),
+            )
+        )
+
+    for name, (subject_role, object_role, predicate) in _RELATION_ROLES.items():
+        for edge_qn, payload in document.get(name, {}).items():
+            _add(payload[subject_role], predicate, payload[object_role], edge_qn)
+    for edge_qn, payload in document.get("wasInfluencedBy", {}).items():
+        _add(
+            payload["prov:influencee"],
+            ProvenancePredicate(payload["ck:predicate"]),
+            payload["prov:influencer"],
+            edge_qn,
+        )
+
+
+def _backfill_evidence_links(graph: ProvenanceGraph) -> None:
+    """Recover each evidence's claim_id and relation from its linking edge.
+
+    Args:
+        graph: The graph whose evidence nodes are updated in place.
+
+    """
+    for edge in graph.relations.values():
+        if edge.object_type is not NodeType.EVIDENCE or edge.object_id not in graph.evidence:
+            continue
+        relation = _PREDICATE_TO_RELATION.get(edge.predicate)
+        if relation is not None and edge.subject_type is NodeType.CLAIM:
+            evidence = graph.evidence[edge.object_id]
+            evidence.claim_id = edge.subject_id
+            evidence.relation = relation
+
+
+def from_prov(document: dict[str, Any]) -> ProvenanceGraph:
+    """Reconstruct a provenance graph from a claimkit PROV-JSON document.
+
+    This is the inbound counterpart to :func:`to_prov`. Because PROV-JSON is a
+    narrower model than claimkit's, the reconstruction is best-effort: fields
+    claimkit does not export (claim tags and timestamps, evidence timestamps,
+    activity kind and used/generated lists, all metadata) fall back to their
+    defaults. An evidence node's ``claim_id`` and intrinsic ``relation`` are
+    recovered from the edge that links it to a claim where possible.
+
+    Args:
+        document: A PROV-JSON document as produced by :func:`to_prov`.
+
+    Returns:
+        The reconstructed graph.
+
+    """
+    entities = document.get("entity", {})
+    activities = document.get("activity", {})
+    agents = document.get("agent", {})
+
+    graph = ProvenanceGraph()
+    _import_nodes(graph, entities, activities)
+    _import_edges(graph, document, _node_type_map(entities, activities, agents))
+    _backfill_evidence_links(graph)
+    return graph
+
+
+def loads_prov(text: str) -> ProvenanceGraph:
+    """Deserialise a provenance graph from a PROV-JSON string.
+
+    Args:
+        text: A PROV-JSON document as produced by :func:`dumps_prov`.
+
+    Returns:
+        The reconstructed graph.
+
+    """
+    return from_prov(json.loads(text))
