@@ -11,12 +11,22 @@ from claimkit.core.claim import Claim, ClaimStatus
 from claimkit.core.evidence import Evidence, EvidenceKind, EvidenceRelation
 from claimkit.core.graph import ProvenanceGraph
 from claimkit.core.provenance import NodeType, ProvenancePredicate, ProvenanceRelation
+from claimkit.core.staleness import (
+    DigestResolver,
+    compute_digest,
+    evidence_changed,
+    find_stale_claims,
+    find_stale_evidence,
+    hash_file,
+    mark_stale_claims,
+)
 
 __all__ = [
     "Activity",
     "ActivityKind",
     "Claim",
     "ClaimStatus",
+    "DigestResolver",
     "Evidence",
     "EvidenceKind",
     "EvidenceRelation",
@@ -24,4 +34,10 @@ __all__ = [
     "ProvenanceGraph",
     "ProvenancePredicate",
     "ProvenanceRelation",
+    "compute_digest",
+    "evidence_changed",
+    "find_stale_claims",
+    "find_stale_evidence",
+    "hash_file",
+    "mark_stale_claims",
 ]
