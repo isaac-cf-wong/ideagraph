@@ -22,8 +22,8 @@ class LoggingLevel(str, enum.Enum):
 
 # Create the main Typer app
 app = typer.Typer(
-    name="package_name",
-    help="Main CLI for package_name.",
+    name="claimkit",
+    help="Claim-level provenance framework for scientific research.",
     rich_markup_mode="rich",
 )
 
