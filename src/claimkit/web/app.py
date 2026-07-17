@@ -24,9 +24,6 @@ from claimkit import (
 #: Node-type label for the front end, keyed by which store it came from.
 _CLAIM, _EVIDENCE, _ACTIVITY = "claim", "evidence", "activity"
 
-#: Truncate long claim statements to this many characters for the node label.
-_LABEL_MAX = 60
-
 
 def _resolver(base: Path):
     """Return a DigestResolver that re-hashes each evidence's reference file."""
@@ -42,11 +39,12 @@ def _resolver(base: Path):
 
 
 def _claim_node(claim: Claim, status: ClaimStatus, stale: bool) -> dict[str, Any]:
-    """Build the front-end node dict for a claim."""
+    """Build the front-end node dict for a claim (column 0)."""
     return {
         "id": claim.id,
         "type": _CLAIM,
-        "label": claim.statement[:_LABEL_MAX] + ("…" if len(claim.statement) > _LABEL_MAX else ""),
+        "level": 0,
+        "label": claim.id,
         "status": "stale" if stale else status.value,
         "statement": claim.statement,
         "tags": list(claim.tags),
@@ -81,7 +79,8 @@ def build_payload(graph_path: str | Path, base: str | Path | None = None) -> dic
             {
                 "id": eid,
                 "type": _EVIDENCE,
-                "label": ev.reference,
+                "level": 1,
+                "label": eid,
                 "status": "evidence",
                 "kind": ev.kind.value,
                 "reference": ev.reference,
@@ -94,6 +93,7 @@ def build_payload(graph_path: str | Path, base: str | Path | None = None) -> dic
             {
                 "id": aid,
                 "type": _ACTIVITY,
+                "level": 2,
                 "label": act.label,
                 "status": "activity",
                 "kind": act.kind.value,
@@ -175,63 +175,103 @@ _INDEX_HTML = """<!doctype html>
 <title>claimkit provenance</title>
 <script src="/vendor/vis-network.min.js"></script>
 <style>
-  body { margin:0; font-family: system-ui, sans-serif; display:flex; flex-direction:column; height:100vh; }
-  #bar { padding:8px 12px; background:#1f2933; color:#fff; font-size:14px; }
-  #bar .chip { display:inline-block; padding:2px 8px; border-radius:10px; margin-right:6px; }
+  :root { --bg:#0f1720; --panel:#f7f9fc; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; display:flex; flex-direction:column;
+         height:100vh; color:#1a2330; }
+  #bar { padding:10px 16px; background:var(--bg); color:#fff; display:flex; align-items:center; gap:14px;
+         flex-wrap:wrap; }
+  #bar b { font-size:15px; letter-spacing:.2px; }
+  .chip { display:inline-flex; align-items:center; padding:3px 10px; border-radius:12px; font-size:12px;
+          font-weight:600; color:#fff; }
+  .counts { color:#9fb0c3; font-size:13px; }
+  .legend { margin-left:auto; display:flex; gap:14px; font-size:12px; color:#c8d3df; }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .sw { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  #cols { display:flex; padding:6px 0; background:#eef2f7; border-bottom:1px solid #dde3ec;
+          font-size:12px; font-weight:700; color:#5b6b7f; text-transform:uppercase; letter-spacing:.5px; }
+  #cols div { flex:1; text-align:center; }
   #main { flex:1; display:flex; min-height:0; }
-  #net { flex:1; }
-  #panel { width:340px; overflow:auto; border-left:1px solid #ddd; padding:12px; font-size:13px; }
-  #panel h3 { margin:.2em 0; } pre { white-space:pre-wrap; word-break:break-word; background:#f6f8fa; padding:8px; }
-  .legend span { margin-right:10px; } .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:3px; }
+  #net { flex:1; background:#fbfcfe; }
+  #panel { width:360px; overflow:auto; border-left:1px solid #dde3ec; padding:16px; font-size:13px;
+           background:var(--panel); }
+  #panel h3 { margin:0 0 4px; font-size:15px; word-break:break-word; }
+  #panel .badge { display:inline-block; padding:2px 9px; border-radius:10px; color:#fff; font-size:11px;
+                  font-weight:700; margin-bottom:10px; }
+  #panel .stmt { font-size:14px; line-height:1.45; margin:8px 0 12px; color:#243244; }
+  #panel .kv { margin:3px 0; color:#42536a; } #panel .kv b { color:#1a2330; }
+  #panel code { background:#e7edf5; padding:1px 5px; border-radius:4px; font-size:12px; word-break:break-all; }
+  pre { white-space:pre-wrap; word-break:break-word; background:#e7edf5; padding:10px; border-radius:6px;
+        font-size:12px; margin:6px 0 0; }
+  .hint { color:#8494a8; }
 </style>
 </head>
 <body>
 <div id="bar">
-  <b>claimkit provenance</b> &nbsp; <span id="summary"></span>
-  <span class="legend" style="float:right">
-    <span><i class="dot" style="background:#2e7d32"></i>valid</span>
-    <span><i class="dot" style="background:#c62828"></i>invalid</span>
-    <span><i class="dot" style="background:#f9a825"></i>stale</span>
-    <span><i class="dot" style="background:#757575"></i>unresolved</span>
-    <span><i class="dot" style="background:#1565c0"></i>evidence</span>
-    <span><i class="dot" style="background:#6a1b9a"></i>activity</span>
+  <b>claimkit provenance</b>
+  <span id="summary"></span>
+  <span class="counts" id="counts"></span>
+  <span class="legend">
+    <span><i class="sw" style="background:#1f9d55"></i>valid</span>
+    <span><i class="sw" style="background:#e0245e"></i>invalid</span>
+    <span><i class="sw" style="background:#f5a623"></i>stale</span>
+    <span><i class="sw" style="background:#8895a7"></i>unresolved</span>
+    <span><i class="sw" style="background:#2f6df6"></i>evidence</span>
+    <span><i class="sw" style="background:#8e44c9"></i>run</span>
   </span>
 </div>
+<div id="cols"><div>Claims (findings)</div><div>Evidence (results)</div><div>Activities (runs)</div></div>
 <div id="main">
   <div id="net"></div>
-  <div id="panel">Click a node to inspect its provenance.</div>
+  <div id="panel"><span class="hint">Click a node to inspect its provenance.</span></div>
 </div>
 <script>
-const COLOR = { valid:"#2e7d32", invalid:"#c62828", stale:"#f9a825", needs_review:"#ef6c00",
-  unresolved:"#757575", evidence:"#1565c0", activity:"#6a1b9a" };
-const SHAPE = { claim:"box", evidence:"ellipse", activity:"diamond" };
+const COLOR = { valid:"#1f9d55", invalid:"#e0245e", stale:"#f5a623", needs_review:"#ef6c00",
+  unresolved:"#8895a7", evidence:"#2f6df6", activity:"#8e44c9" };
+const DARKTEXT = new Set(["stale","needs_review"]);  // light fills -> dark text
 let byId = {};
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
 async function load() {
   const data = await (await fetch("/api/graph")).json();
   byId = Object.fromEntries(data.nodes.map(n => [n.id, n]));
-  const nodes = data.nodes.map(n => ({ id:n.id, label:n.label, shape:SHAPE[n.type]||"dot",
-    color:{ background:COLOR[n.status]||"#999", border:"#333" }, font:{color:n.type==="claim"?"#fff":"#000"} }));
-  const edges = data.edges.map(e => ({ from:e.source, to:e.target, label:e.predicate, arrows:"to",
-    font:{size:9, color:"#666"}, color:{color:"#bbb"} }));
+  const nodes = data.nodes.map(n => {
+    const bg = COLOR[n.status] || "#8895a7";
+    const fg = DARKTEXT.has(n.status) ? "#1a2330" : "#ffffff";
+    return { id:n.id, label:n.label, level:n.level, shape:"box",
+      color:{ background:bg, border:bg, highlight:{background:bg, border:"#111"} },
+      font:{ color:fg, size:15, face:"system-ui", bold: n.type==="claim" },
+      margin:10, widthConstraint:{ maximum:210 }, shapeProperties:{ borderRadius:7 }, borderWidth:2 };
+  });
+  const edges = data.edges.map(e => ({ from:e.source, to:e.target, arrows:{to:{scaleFactor:.6}},
+    smooth:{ type:"cubicBezier", forceDirection:"horizontal", roundness:.55 },
+    color:{ color:"#c3ccd8", highlight:"#5b6b7f" }, width:1.5 }));
   const sm = Object.entries(data.summary).map(([k,v]) =>
-    `<span class="chip" style="background:${COLOR[k]||'#999'}">${k}: ${v}</span>`).join("");
-  document.getElementById("summary").innerHTML = sm +
-    ` &nbsp; ${data.counts.claims} claims · ${data.counts.evidence} evidence · ${data.counts.activities} activities`;
+    `<span class="chip" style="background:${COLOR[k]||'#8895a7'}">${v} ${k}</span>`).join(" ");
+  document.getElementById("summary").innerHTML = sm;
+  document.getElementById("counts").textContent =
+    `${data.counts.claims} claims · ${data.counts.evidence} evidence · ${data.counts.activities} runs`;
   const net = new vis.Network(document.getElementById("net"),
     { nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges) },
-    { layout:{ hierarchical:{ direction:"LR", sortMethod:"directed", nodeSpacing:120 } },
-      physics:false, interaction:{ hover:true } });
+    { layout:{ hierarchical:{ enabled:true, direction:"LR", sortMethod:"directed",
+        levelSeparation:430, nodeSpacing:120, treeSpacing:240, blockShifting:true,
+        edgeMinimization:true, parentCentralization:true, shakeTowards:"roots" } },
+      physics:false, interaction:{ hover:true, tooltipDelay:120 } });
+  net.once("afterDrawing", () => net.fit({ animation:false }));
   net.on("click", p => {
-    if (!p.nodes.length) return;
+    const panel = document.getElementById("panel");
+    if (!p.nodes.length) { panel.innerHTML = '<span class="hint">Click a node to inspect its provenance.</span>'; return; }
     const n = byId[p.nodes[0]];
-    let h = `<h3>${n.type}: ${n.id}</h3><b>status:</b> ${n.status}<br/>`;
-    if (n.statement) h += `<p>${n.statement}</p>`;
-    if (n.reference) h += `<b>reference:</b> ${n.reference}<br/>`;
-    if (n.digest) h += `<b>digest:</b> <code>${n.digest}</code><br/>`;
-    if (n.kind) h += `<b>kind:</b> ${n.kind}<br/>`;
+    const bg = COLOR[n.status] || "#8895a7";
+    let h = `<h3>${esc(n.id)}</h3><span class="badge" style="background:${bg}">${esc(n.type)} · ${esc(n.status)}</span>`;
+    if (n.statement) h += `<div class="stmt">${esc(n.statement)}</div>`;
+    if (n.kind) h += `<div class="kv"><b>kind:</b> ${esc(n.kind)}</div>`;
+    if (n.reference) h += `<div class="kv"><b>reference:</b> ${esc(n.reference)}</div>`;
+    if (n.digest) h += `<div class="kv"><b>digest:</b> <code>${esc(n.digest)}</code></div>`;
+    if (n.tags && n.tags.length) h += `<div class="kv"><b>tags:</b> ${esc(n.tags.join(", "))}</div>`;
     if (n.metadata && Object.keys(n.metadata).length)
-      h += `<b>metadata:</b><pre>${JSON.stringify(n.metadata, null, 2)}</pre>`;
-    document.getElementById("panel").innerHTML = h;
+      h += `<div class="kv"><b>metadata:</b></div><pre>${esc(JSON.stringify(n.metadata, null, 2))}</pre>`;
+    panel.innerHTML = h;
   });
 }
 load();
