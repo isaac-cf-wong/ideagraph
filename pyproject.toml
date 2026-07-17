@@ -20,6 +20,10 @@ requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = ["typer>=0.26.8"]
 
+[project.optional-dependencies]
+# `pip install claimkit[web]` enables the `claimkit serve` provenance web UI.
+web = ["flask>=3.0"]
+
 [dependency-groups]
 dev = [
   "ruff>=0.15.21",
