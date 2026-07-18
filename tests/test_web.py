@@ -132,3 +132,66 @@ def test_serve_missing_file(tmp_path):
     result = runner.invoke(app, ["serve", str(tmp_path / "nope.json")])
     assert result.exit_code == 1
     assert "No such file" in result.stderr
+
+
+def test_render_document_latex_and_markdown():
+    r"""render_document turns \prov / prov: marks into data-id spans."""
+    from claimkit.web.document import render_document
+
+    tex, ids = render_document(r"The bias is \prov{far-untrustworthy}{3--5 decades} here.", "latex")
+    assert ids == ["far-untrustworthy"]
+    assert 'class="prov" data-id="far-untrustworthy"' in tex
+    assert "3–5 decades" in tex  # noqa: RUF001 - en dash from -- collapse
+
+    md, mids = render_document("The bias is [3-5 decades](prov:far-untrustworthy) here.", "markdown")
+    assert mids == ["far-untrustworthy"]
+    assert 'data-id="far-untrustworthy"' in md
+
+
+def test_build_doc_payload_resolves_and_flags_dangling(tmp_path):
+    """build_doc_payload marks refs known/unknown against the graph.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+
+    """
+    from claimkit.web import build_payload
+    from claimkit.web.app import build_doc_payload
+
+    g = ProvenanceGraph()
+    g.add_claim(Claim(statement="known finding", id="c1"))
+    path = tmp_path / "g.json"
+    save_graph(g, path)
+    doc = tmp_path / "d.tex"
+    doc.write_text(r"See \prov{c1}{X} and \prov{ghost}{Y}.")
+
+    payload = build_doc_payload(doc, build_payload(path))
+    assert payload["refs"]["c1"]["known"] is True
+    assert payload["refs"]["ghost"]["known"] is False
+    assert payload["refs"]["ghost"]["status"] == "unknown"
+
+
+def test_doc_routes(tmp_path):
+    """The /api/docs and /api/doc/<i> routes serve the reading view.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+
+    """
+    pytest.importorskip("flask")
+    from claimkit.web import create_app
+
+    g = ProvenanceGraph()
+    g.add_claim(Claim(statement="known finding", id="c1"))
+    gpath = tmp_path / "g.json"
+    save_graph(g, gpath)
+    doc = tmp_path / "results.tex"
+    doc.write_text(r"Result is \prov{c1}{42}.")
+
+    client = create_app(gpath, docs=[doc]).test_client()
+    docs = client.get("/api/docs").get_json()
+    assert docs == [{"i": 0, "name": "results.tex"}]
+    body = client.get("/api/doc/0").get_json()
+    assert 'data-id="c1"' in body["html"]
+    assert body["refs"]["c1"]["known"] is True
+    assert client.get("/api/doc/9").status_code == 404
