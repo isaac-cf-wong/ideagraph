@@ -140,12 +140,18 @@ def build_doc_payload(doc_path: str | Path, graph_payload: dict[str, Any]) -> di
         ``known`` flag (``known=False`` = the draft cites an id absent from the
         graph — a dangling provenance reference).
     """
-    from claimkit.web.document import detect_format, expand_inputs, render_document
+    from claimkit.web.document import detect_format, expand_inputs, parse_aux_labels, render_document
 
     doc_path = Path(doc_path)
     fmt = detect_format(str(doc_path))
-    text = expand_inputs(doc_path) if fmt == "latex" else doc_path.read_text()
-    body, ref_ids = render_document(text, fmt)
+    if fmt == "latex":
+        text = expand_inputs(doc_path)
+        aux = doc_path.with_suffix(".aux")
+        if not aux.exists():
+            aux = doc_path.parent / "main.aux"
+        body, ref_ids = render_document(text, fmt, labels=parse_aux_labels(aux), base=doc_path.parent)
+    else:
+        body, ref_ids = render_document(doc_path.read_text(), fmt)
     by_id = {n["id"]: n for n in graph_payload["nodes"]}
     refs = {
         rid: {
@@ -193,6 +199,21 @@ def create_app(graph_path: str | Path, base: str | Path | None = None, docs: lis
         if i < 0 or i >= len(doc_list):
             abort(404)
         return jsonify(build_doc_payload(doc_list[i], build_payload(graph_path, base)))
+
+    asset_root = doc_list[0].resolve().parent if doc_list else None
+    _asset_exts = {".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp", ".pdf"}
+
+    @app.route("/asset/<path:relpath>")
+    def asset(relpath):  # type: ignore[no-untyped-def]
+        import mimetypes
+
+        if asset_root is None:
+            abort(404)
+        target = (asset_root / relpath).resolve()
+        if asset_root not in target.parents or target.suffix.lower() not in _asset_exts or not target.is_file():
+            abort(404)
+        mime = mimetypes.guess_type(str(target))[0] or "application/octet-stream"
+        return Response(target.read_bytes(), mimetype=mime)
 
     @app.route("/vendor/<path:name>")
     def vendor(name):  # type: ignore[no-untyped-def]
@@ -253,6 +274,11 @@ _INDEX_HTML = """<!doctype html>
   #docbody { flex:1; overflow:auto; padding:28px 48px; }
   #docbody article { max-width:880px; margin:0 auto; font-size:19px; line-height:1.7; color:#1c2735; }
   #docbody h2 { font-size:27px; margin:1.2em 0 .4em; } #docbody h3 { font-size:21px; margin:1em 0 .3em; }
+  #docbody figure { margin:1.8em auto; text-align:center; }
+  #docbody .figimg { max-width:100%; height:auto; border:1px solid #dde3ec; border-radius:4px; }
+  #docbody .figpdf { width:100%; height:520px; border:1px solid #dde3ec; border-radius:4px; }
+  #docbody figcaption { font-size:15px; line-height:1.5; color:#42536a; margin-top:.6em; text-align:left; }
+  #docbody .fignote { color:#8494a8; font-style:italic; padding:12px; border:1px dashed #c3ccd8; border-radius:4px; }
   .prov { border-bottom:2.5px solid #8895a7; cursor:pointer; padding-bottom:1px; }
   .prov:hover { background:#eef3ff; }
   .prov[data-status=valid]{ border-color:#1f9d55; } .prov[data-status=invalid]{ border-color:#e0245e; }

@@ -122,7 +122,50 @@ def _extract_markdown_prov(text: str) -> tuple[str, list[tuple[str, str]]]:
 
 
 _LATEX_UNWRAP = re.compile(r"\\(?:emph|textbf|textit|texttt|gls|glspl|text|mbox|ensuremath)\s*\{")
-_LATEX_DROP_ARG = re.compile(r"\\(?:label|cite[a-z]*|ref|eqref|footnote|index)\s*\{[^{}]*\}")
+_LATEX_DROP_ARG = re.compile(r"\\(?:label|cite[a-z]*|footnote|index)\s*\{[^{}]*\}")
+_REF_RE = re.compile(r"\\(ref|eqref|cref|Cref|autoref)\s*\{([^}]+)\}")
+#: \newlabel{KEY}{{NUMBER}{PAGE}...} in a LaTeX .aux; NUMBER has no nested braces.
+_AUX_LABEL_RE = re.compile(r"\\newlabel\s*\{([^}]+)\}\s*\{\{([^{}]*)\}")
+_FIGURE_RE = re.compile(r"\\begin\{figure\*?\}.*?\\end\{figure\*?\}", re.DOTALL)
+_INCLUDEGRAPHICS_RE = re.compile(r"\\includegraphics(?:\[[^\]]*\])?\s*\{([^}]+)\}")
+#: Image extensions a browser can show with <img>; a .pdf figure is embedded.
+_RASTER_EXTS = (".png", ".svg", ".jpg", ".jpeg", ".gif", ".webp")
+
+
+def parse_aux_labels(aux_path: str | Path) -> dict[str, str]:
+    r"""Parse ``\newlabel`` entries from a LaTeX ``.aux`` into ``{key: number}``.
+
+    Args:
+        aux_path: Path to the ``.aux`` file (may not exist).
+
+    Returns:
+        A mapping of label key to its printed number (e.g. ``sec:methods`` ->
+        ``II``); empty if the file is absent.
+    """
+    aux_path = Path(aux_path)
+    if not aux_path.exists():
+        return {}
+    labels: dict[str, str] = {}
+    for key, num in _AUX_LABEL_RE.findall(aux_path.read_text(errors="replace")):
+        if "@" in key:  # cleveref/hyperref sidecar labels
+            continue
+        clean = num.replace("\\,", " ").replace("\\;", " ").replace("{", "").replace("}", "").strip()
+        if clean:
+            labels[key] = clean
+    return labels
+
+
+def _resolve_refs(text: str, labels: dict[str, str]) -> str:
+    r"""Replace ``\ref``/``\eqref``/``\cref`` with numbers from the aux labels."""
+
+    def _sub(m: re.Match) -> str:
+        cmd, key = m.group(1), m.group(2).strip()
+        num = labels.get(key, "??")
+        return f"({num})" if cmd == "eqref" else num
+
+    return _REF_RE.sub(_sub, text)
+
+
 #: Title-block commands whose (balanced-brace) argument is dropped entirely.
 _DROP_CMDS = ("author", "email", "affiliation", "altaffiliation", "thanks", "homepage", "orcidlink", "date")
 _DROP_CMDS_RE = re.compile(r"\\(?:" + "|".join(_DROP_CMDS) + r")\s*(?:\[[^\]]*\])?\s*(?=\{)")
@@ -152,9 +195,61 @@ def _drop_cmds(text: str) -> str:
     return "".join(out)
 
 
-def _latex_prose_to_html(text: str) -> str:
+def _resolve_asset(raw: str, base: Path | None) -> tuple[str, str]:
+    """Resolve an includegraphics path to a file; return (relpath, kind).
+
+    ``kind`` is ``"img"`` (browser-renderable raster), ``"embed"`` (a PDF to
+    embed), or ``"none"`` (no file found). A missing extension is resolved by
+    trying raster extensions first, then ``.pdf``.
+    """
+    p = Path(raw)
+    candidates = [p] if p.suffix else [p.with_suffix(e) for e in (*_RASTER_EXTS, ".pdf")]
+    for c in candidates:
+        if base is not None and (base / c).exists():
+            return str(c), ("img" if c.suffix.lower() in _RASTER_EXTS else "embed")
+    ext = p.suffix.lower()
+    kind = "img" if ext in _RASTER_EXTS else "embed" if ext == ".pdf" else "none"
+    return raw, kind
+
+
+def _render_figure(block: str, labels: dict[str, str], base: Path | None, asset_prefix: str) -> str:
+    """Render a LaTeX ``figure`` environment to an HTML ``<figure>``."""
+    m = _INCLUDEGRAPHICS_RE.search(block)
+    if m:
+        rel, kind = _resolve_asset(m.group(1).strip(), base)
+        src = html.escape(asset_prefix + rel)
+        if kind == "img":
+            inner = f'<img class="figimg" src="{src}" alt="figure"/>'
+        elif kind == "embed":
+            inner = f'<embed class="figpdf" src="{src}" type="application/pdf"/>'
+        else:
+            inner = f'<div class="fignote">[figure: {html.escape(m.group(1).strip())} — no renderable file]</div>'
+    else:
+        inner = '<div class="fignote">[figure pending]</div>'
+    caption = ""
+    cm = re.search(r"\\caption\s*\{", block)
+    if cm:
+        ctext, _ = _match_braces(block, cm.end() - 1)
+        rendered = re.sub(r"^<p>|</p>$", "", _latex_prose_to_html(ctext, labels, base, asset_prefix).strip())
+        caption = f"<figcaption>{rendered}</figcaption>"
+    return f"<figure>{inner}{caption}</figure>"
+
+
+def _latex_prose_to_html(
+    text: str, labels: dict[str, str] | None = None, base: Path | None = None, asset_prefix: str = "/asset/"
+) -> str:
     """Very small LaTeX->HTML prose pass; math is preserved for MathJax."""
+    labels = labels or {}
     text = re.sub(r"(?<!\\)%.*", "", text)  # comments
+    text = _resolve_refs(text, labels)
+    # Figures -> HTML tokens, restored raw at the end (kept out of escaping).
+    figures: list[str] = []
+
+    def _keep_fig(mo: re.Match) -> str:
+        figures.append(_render_figure(mo.group(0), labels, base, asset_prefix))
+        return f"\x00F{len(figures) - 1}\x00"
+
+    text = _FIGURE_RE.sub(_keep_fig, text)
     # Protect math (display before inline) so macro-stripping leaves it intact;
     # MathJax typesets it client-side. Escaped for HTML at restore time.
     math: list[str] = []
@@ -209,6 +304,8 @@ def _latex_prose_to_html(text: str) -> str:
     out_html = "\n".join(rendered)
     for idx, expr in enumerate(math):  # restore math verbatim (HTML-escaped, delimiters kept)
         out_html = out_html.replace(f"\x00M{idx}\x00", html.escape(expr))
+    for idx, fig in enumerate(figures):  # restore figure HTML raw
+        out_html = out_html.replace(f"\x00F{idx}\x00", fig)
     return out_html
 
 
@@ -231,12 +328,16 @@ def _markdown_prose_to_html(text: str) -> str:
     return "\n".join(blocks)
 
 
-def render_document(text: str, fmt: str) -> tuple[str, list[str]]:
-    """Render a draft to reading-view HTML with provenance spans.
+def render_document(
+    text: str, fmt: str, labels: dict[str, str] | None = None, base: Path | None = None
+) -> tuple[str, list[str]]:
+    r"""Render a draft to reading-view HTML with provenance spans.
 
     Args:
         text: The raw LaTeX or Markdown source.
         fmt: ``"latex"`` or ``"markdown"``.
+        labels: ``{key: number}`` from the ``.aux`` for resolving ``\ref`` (LaTeX).
+        base: Directory that ``\includegraphics`` paths resolve against (LaTeX).
 
     Returns:
         ``(html, ref_ids)`` — the rendered HTML and the provenance ids referenced
@@ -247,8 +348,10 @@ def render_document(text: str, fmt: str) -> tuple[str, list[str]]:
         if body_match:  # skip the preamble when given a full document
             text = body_match.group(1)
         stripped, refs = _extract_latex_prov(text)
-        body = _latex_prose_to_html(stripped)
-        inner_render = _latex_prose_to_html
+        body = _latex_prose_to_html(stripped, labels, base)
+
+        def inner_render(t: str) -> str:
+            return _latex_prose_to_html(t, labels, base)
     else:
         stripped, refs = _extract_markdown_prov(text)
         body = _markdown_prose_to_html(stripped)
