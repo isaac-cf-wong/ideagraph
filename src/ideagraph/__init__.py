@@ -40,6 +40,7 @@ from ideagraph.core import (
     validate_all,
     validate_claim,
 )
+from ideagraph.library import Edge, IndexResult, Library, SearchHit
 from ideagraph.persistence import (
     SCHEMA_VERSION,
     dumps_graph,
@@ -64,13 +65,17 @@ __all__ = [
     "CrossReference",
     "Diagnostic",
     "DigestResolver",
+    "Edge",
     "Evidence",
     "EvidenceKind",
     "EvidenceRelation",
+    "IndexResult",
+    "Library",
     "NodeType",
     "ProvenanceGraph",
     "ProvenancePredicate",
     "ProvenanceRelation",
+    "SearchHit",
     "Statement",
     "StatementStatus",
     "StatementType",

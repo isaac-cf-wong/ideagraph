@@ -95,6 +95,7 @@ def register_commands() -> None:
     from ideagraph.cli.doctor import doctor_command
     from ideagraph.cli.export import export_command
     from ideagraph.cli.import_prov import import_command
+    from ideagraph.cli.index import index_command
     from ideagraph.cli.init import init_command
     from ideagraph.cli.mark import mark_command
     from ideagraph.cli.report import report_command
@@ -114,6 +115,7 @@ def register_commands() -> None:
     app.command(name="coverage")(coverage_command)
     app.command(name="digest")(digest_command)
     app.command(name="doctor")(doctor_command)
+    app.command(name="index")(index_command)
     app.command(name="validate")(validate_command)
     app.command(name="mark")(mark_command)
     app.command(name="stale")(stale_command)
