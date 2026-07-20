@@ -52,10 +52,12 @@ from ideagraph.persistence import (
 )
 from ideagraph.prov import dumps_prov, from_prov, loads_prov, to_prov
 from ideagraph.reporting import render_claim_report, render_report
+from ideagraph.semantic import DEFAULT_MODEL, Embedder, SentenceTransformerEmbedder
 from ideagraph.version import __version__
 
 __all__ = [
     "ASSERTION_TYPES",
+    "DEFAULT_MODEL",
     "SCHEMA_VERSION",
     "Activity",
     "ActivityKind",
@@ -66,6 +68,7 @@ __all__ = [
     "Diagnostic",
     "DigestResolver",
     "Edge",
+    "Embedder",
     "Evidence",
     "EvidenceKind",
     "EvidenceRelation",
@@ -76,6 +79,7 @@ __all__ = [
     "ProvenancePredicate",
     "ProvenanceRelation",
     "SearchHit",
+    "SentenceTransformerEmbedder",
     "Statement",
     "StatementStatus",
     "StatementType",

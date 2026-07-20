@@ -18,6 +18,7 @@ reported as skipped so the gap is visible rather than silent.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,6 +27,7 @@ from ideagraph.core import ProvenanceGraph
 from ideagraph.core.identity import global_id
 from ideagraph.core.staleness import compute_digest
 from ideagraph.persistence import load_graph
+from ideagraph.semantic import cosine, normalize, text_hash
 
 #: Default location of the index database, relative to the library root.
 DEFAULT_DB_RELPATH = ".ideagraph/index.db"
@@ -62,6 +64,14 @@ CREATE INDEX IF NOT EXISTS ix_edges_article ON edges (article_id);
 CREATE VIRTUAL TABLE IF NOT EXISTS statements_fts USING fts5 (
     gid UNINDEXED, article_id UNINDEXED, text
 );
+CREATE TABLE IF NOT EXISTS embeddings (
+    gid        TEXT PRIMARY KEY,
+    article_id TEXT NOT NULL,
+    model      TEXT NOT NULL,
+    text_hash  TEXT NOT NULL,
+    vector     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_embeddings_article ON embeddings (article_id);
 """
 
 
@@ -218,6 +228,9 @@ class Library:
         self._conn.execute("DELETE FROM statements WHERE article_id = ?", (article_id,))
         self._conn.execute("DELETE FROM edges WHERE article_id = ?", (article_id,))
         self._conn.execute("DELETE FROM articles WHERE article_id = ?", (article_id,))
+        # Embeddings are intentionally NOT dropped here: they survive a reindex so
+        # unchanged statements keep their vectors (embed() re-embeds only changed
+        # text and prunes orphans whose statement no longer exists).
 
     def _reindex_article(self, article_id: str, path: Path, graph: ProvenanceGraph, content_hash: str) -> None:
         """Replace an article's rows with a fresh index of its graph."""
@@ -449,6 +462,74 @@ class Library:
                 "cross_edges": sum(1 for e in edges if e["kind"] == "cross"),
             },
         }
+
+    # -- semantic search (optional) --------------------------------------
+
+    def embed(self, embedder, *, rebuild: bool = False) -> int:  # type: ignore[no-untyped-def]
+        """Embed statements that are missing a current vector for this model.
+
+        Incremental: a statement is (re)embedded only when it has no vector for
+        ``embedder.name``, or its text changed since it was last embedded (or
+        ``rebuild`` is set). Vectors are stored normalised.
+
+        Args:
+            embedder: An object with ``name`` and ``embed(texts) -> vectors``.
+            rebuild: Re-embed every statement regardless of existing vectors.
+
+        Returns:
+            The number of statements embedded in this call.
+        """
+        # Drop vectors whose statement no longer exists (removed article / node).
+        self._conn.execute("DELETE FROM embeddings WHERE gid NOT IN (SELECT gid FROM statements)")
+        existing = {
+            row["gid"]: row["text_hash"]
+            for row in self._conn.execute("SELECT gid, text_hash FROM embeddings WHERE model = ?", (embedder.name,))
+        }
+        todo = []
+        for row in self._conn.execute("SELECT gid, article_id, text FROM statements"):
+            th = text_hash(row["text"] or "")
+            if rebuild or existing.get(row["gid"]) != th:
+                todo.append((row["gid"], row["article_id"], row["text"] or "", th))
+        if not todo:
+            return 0
+        vectors = embedder.embed([t[2] for t in todo])
+        for (gid, article_id, _text, th), vec in zip(todo, vectors, strict=True):
+            unit = normalize([float(x) for x in vec])
+            self._conn.execute(
+                "INSERT INTO embeddings (gid, article_id, model, text_hash, vector) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(gid) DO UPDATE SET model=excluded.model, text_hash=excluded.text_hash, "
+                "vector=excluded.vector, article_id=excluded.article_id",
+                (gid, article_id, embedder.name, th, json.dumps(unit)),
+            )
+        self._conn.commit()
+        return len(todo)
+
+    def semantic_search(self, query: str, embedder, *, k: int = 10) -> list[SearchHit]:  # type: ignore[no-untyped-def]
+        """Rank statements by embedding similarity to a query.
+
+        Only vectors produced by ``embedder.name`` are considered; call
+        :meth:`embed` first so the index is populated. Similarity is cosine over
+        the stored normalised vectors.
+
+        Args:
+            query: The free-text query.
+            embedder: The embedder (its ``name`` selects which vectors to use).
+            k: Maximum number of hits to return.
+
+        Returns:
+            The best-matching statements, most similar first.
+        """
+        qvec = normalize([float(x) for x in embedder.embed([query])[0]])
+        scored: list[tuple[float, str]] = []
+        for row in self._conn.execute("SELECT gid, vector FROM embeddings WHERE model = ?", (embedder.name,)):
+            scored.append((cosine(qvec, json.loads(row["vector"])), row["gid"]))
+        scored.sort(key=lambda s: s[0], reverse=True)
+        hits = []
+        for _score, gid in scored[:k]:
+            hit = self.get_statement(gid)
+            if hit is not None:
+                hits.append(hit)
+        return hits
 
     def dangling_cross_references(self) -> list[Edge]:
         """Return cross-article edges whose target statement is not in the index.
