@@ -21,9 +21,8 @@ dynamic = ["version"]
 dependencies = ["typer>=0.26.8"]
 
 [project.optional-dependencies]
-# `pip install ideagraph[web]` enables the Django web interface (and, until it
-# is retired, the legacy Flask `ideagraph serve` UI).
-web = ["flask>=3.0", "django>=5.2,<6.0", "djangorestframework>=3.15"]
+# `pip install ideagraph[web]` enables the Django web interface + REST API.
+web = ["django>=5.2,<6.0", "djangorestframework>=3.15"]
 # `pip install ideagraph[semantic]` enables `ideagraph find --semantic` (the
 # default sentence-transformer embedder). Any custom embedder works without it.
 semantic = ["sentence-transformers>=3.0"]

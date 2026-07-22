@@ -21,7 +21,4 @@ extend-ignore-re = [
 
 [files]
 # Vendored third-party libraries (offline copies) — not our source to spell-check.
-extend-exclude = [
-  "src/ideagraph/web/static/",
-  "src/ideagraph/server/web/static/web/vendor/",
-]
+extend-exclude = ["src/ideagraph/server/web/static/web/vendor/"]
