@@ -20,7 +20,9 @@ from ideagraph.kg.profile import (
     get_profile,
     register_profile,
 )
-from ideagraph.kg.profiles import RESEARCH
+from ideagraph.kg.prov import dumps_prov, from_prov, loads_prov, to_prov
+
+from ideagraph.kg.profiles import RESEARCH  # isort: skip  (profiles import kg core)
 
 __all__ = [
     "RESEARCH",
@@ -32,6 +34,10 @@ __all__ = [
     "NodeRule",
     "Profile",
     "available_profiles",
+    "dumps_prov",
+    "from_prov",
     "get_profile",
+    "loads_prov",
     "register_profile",
+    "to_prov",
 ]
