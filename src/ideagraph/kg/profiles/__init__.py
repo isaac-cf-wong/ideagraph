@@ -15,6 +15,7 @@ from ideagraph.kg.profiles.research import (
     RESEARCH,
     STATEMENT_TYPES,
 )
+from ideagraph.kg.profiles.research_compat import graph_from_legacy
 from ideagraph.kg.profiles.research_ops import (
     Coverage,
     DigestResolver,
@@ -45,6 +46,7 @@ __all__ = [
     "evidence_changed",
     "find_stale_assertions",
     "find_stale_evidence",
+    "graph_from_legacy",
     "mark_stale",
     "validate_all",
     "validate_node",
