@@ -29,7 +29,7 @@ def set_article_command(
     from logging import getLogger
 
     from ideagraph.core.identity import SEP
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg.persistence import load_graph, save_graph
 
     logger = getLogger("ideagraph")
 

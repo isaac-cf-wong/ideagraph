@@ -7,16 +7,8 @@ import json
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import (
-    Claim,
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-)
-from ideagraph.persistence import load_graph, save_graph
+from ideagraph.kg import Edge, KnowledgeGraph, Node
+from ideagraph.kg.persistence import load_graph, save_graph
 
 runner = CliRunner()
 
@@ -32,16 +24,14 @@ def _graph_file(path, *, supported: bool = True):
         The path written to.
 
     """
-    g = ProvenanceGraph()
-    g.add_claim(Claim(statement="A", id="c1"))
-    g.add_evidence(Evidence(claim_id="c1", kind=EvidenceKind.DATA, reference="r", id="e1"))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY if supported else ProvenancePredicate.REFUTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
+    g = KnowledgeGraph()
+    g.add_node(Node(type="claim", text="A", id="c1", properties={"status": "unresolved"}))
+    g.add_node(Node(type="evidence", id="e1", properties={"kind": "data", "reference": "r"}))
+    g.add_edge(
+        Edge(
+            type="supported_by" if supported else "refuted_by",
+            source="c1",
+            target="e1",
             id="edge-1",
         )
     )
@@ -59,7 +49,7 @@ def test_validate_human_output(tmp_path):
     path = _graph_file(tmp_path / "g.json")
     result = runner.invoke(app, ["validate", str(path)])
     assert result.exit_code == 0
-    assert "c1: valid — supported by 1 piece(s) of evidence" in result.stdout
+    assert "c1: valid — supported by 1 piece(s)" in result.stdout
 
 
 def test_validate_json_output(tmp_path):
@@ -86,7 +76,7 @@ def test_validate_does_not_mutate_without_apply(tmp_path):
     """
     path = _graph_file(tmp_path / "g.json")
     runner.invoke(app, ["validate", str(path)])
-    assert load_graph(path).claims["c1"].status.value == "unresolved"
+    assert load_graph(path).nodes["c1"].properties["status"] == "unresolved"
 
 
 def test_validate_apply_persists_status(tmp_path):
@@ -99,7 +89,7 @@ def test_validate_apply_persists_status(tmp_path):
     path = _graph_file(tmp_path / "g.json")
     result = runner.invoke(app, ["validate", str(path), "--apply"])
     assert result.exit_code == 0
-    assert load_graph(path).claims["c1"].status.value == "valid"
+    assert load_graph(path).nodes["c1"].properties["status"] == "valid"
 
 
 def test_validate_missing_file(tmp_path):

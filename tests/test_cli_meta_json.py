@@ -5,7 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -45,8 +45,8 @@ def test_add_claim_meta_json_stores_structured_value(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.stderr
-    claim = load_graph(path).claims["c1"]
-    assert claim.metadata["value"] == {"triangle": {"loud10": 0.0}, "twol": {"loud10": 70.0}}
+    node = load_graph(path).nodes["c1"]
+    assert node.properties["metadata"]["value"] == {"triangle": {"loud10": 0.0}, "twol": {"loud10": 70.0}}
 
 
 def test_meta_and_meta_json_merge(tmp_path):
@@ -71,7 +71,7 @@ def test_meta_and_meta_json_merge(tmp_path):
             "samples=[1, 2, 3]",
         ],
     )
-    meta = load_graph(path).claims["c1"].metadata
+    meta = load_graph(path).nodes["c1"].properties["metadata"]
     assert meta["units"] == "ratio"
     assert meta["samples"] == [1, 2, 3]
 
@@ -94,8 +94,8 @@ def test_add_evidence_and_activity_meta_json(tmp_path):
         ["add-activity", str(path), "run", "--kind", "computation", "--id", "a1", "--meta-json", "seeds=[42, 43]"],
     )
     g = load_graph(path)
-    assert g.evidence["e1"].metadata["n"] == 42
-    assert g.activities["a1"].metadata["seeds"] == [42, 43]
+    assert g.nodes["e1"].properties["metadata"]["n"] == 42
+    assert g.nodes["a1"].properties["metadata"]["seeds"] == [42, 43]
 
 
 def test_invalid_json_exits_nonzero(tmp_path):

@@ -5,17 +5,9 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import (
-    Claim,
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-)
-from ideagraph.persistence import load_graph
-from ideagraph.prov import dumps_prov
+from ideagraph.kg import Edge, KnowledgeGraph, Node
+from ideagraph.kg.persistence import load_graph
+from ideagraph.kg.prov import dumps_prov
 
 runner = CliRunner()
 
@@ -30,19 +22,10 @@ def _prov_file(path):
         The path written to.
 
     """
-    g = ProvenanceGraph()
-    g.add_claim(Claim(statement="A", id="c1"))
-    g.add_evidence(Evidence(claim_id="c1", kind=EvidenceKind.DATA, reference="r", id="e1"))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
-            id="s1",
-        )
-    )
+    g = KnowledgeGraph()
+    g.add_node(Node(type="claim", text="A", id="c1", properties={"status": "unresolved"}))
+    g.add_node(Node(type="evidence", id="e1", properties={"kind": "data", "reference": "r"}))
+    g.add_edge(Edge(type="supported_by", source="c1", target="e1", id="s1"))
     path.write_text(dumps_prov(g), encoding="utf-8")
     return path
 
@@ -59,9 +42,9 @@ def test_import_writes_graph(tmp_path):
     result = runner.invoke(app, ["import", str(src), str(dest)])
     assert result.exit_code == 0
     graph = load_graph(dest)
-    assert graph.claims["c1"].statement == "A"
-    assert graph.evidence["e1"].claim_id == "c1"
-    assert graph.outgoing("c1")[0].predicate is ProvenancePredicate.SUPPORTED_BY
+    assert graph.nodes["c1"].text == "A"
+    assert graph.nodes["e1"].type == "evidence"
+    assert graph.outgoing("c1")[0].type == "supported_by"
 
 
 def test_import_missing_source(tmp_path):
@@ -104,7 +87,7 @@ def test_import_force_overwrites(tmp_path):
     dest.write_text("sentinel", encoding="utf-8")
     result = runner.invoke(app, ["import", str(src), str(dest), "--force"])
     assert result.exit_code == 0
-    assert load_graph(dest).claims["c1"].statement == "A"
+    assert load_graph(dest).nodes["c1"].text == "A"
 
 
 def test_export_then_import_round_trips_via_cli(tmp_path):
@@ -124,6 +107,6 @@ def test_export_then_import_round_trips_via_cli(tmp_path):
     result = runner.invoke(app, ["import", str(prov_path), str(back_path)])
     assert result.exit_code == 0
     back = load_graph(back_path)
-    assert back.claims["c1"].statement == "A"
-    assert len(back.evidence) == 1
-    assert back.outgoing("c1")[0].predicate is ProvenancePredicate.SUPPORTED_BY
+    assert back.nodes["c1"].text == "A"
+    assert len([n for n in back.nodes.values() if n.type == "evidence"]) == 1
+    assert back.outgoing("c1")[0].type == "supported_by"

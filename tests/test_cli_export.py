@@ -7,17 +7,9 @@ import json
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import (
-    Claim,
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-)
-from ideagraph.persistence import save_graph
-from ideagraph.prov import CK_NAMESPACE
+from ideagraph.kg import Edge, KnowledgeGraph, Node
+from ideagraph.kg.persistence import save_graph
+from ideagraph.kg.prov import CK_NAMESPACE
 
 runner = CliRunner()
 
@@ -32,19 +24,10 @@ def _graph_file(path):
         The path written to.
 
     """
-    g = ProvenanceGraph()
-    g.add_claim(Claim(statement="A", id="c1"))
-    g.add_evidence(Evidence(claim_id="c1", kind=EvidenceKind.DATA, reference="r", id="e1"))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
-            id="s1",
-        )
-    )
+    g = KnowledgeGraph()
+    g.add_node(Node(type="claim", text="A", id="c1", properties={"status": "unresolved"}))
+    g.add_node(Node(type="evidence", id="e1", properties={"kind": "data", "reference": "r"}))
+    g.add_edge(Edge(type="supported_by", source="c1", target="e1", id="s1"))
     save_graph(g, path)
     return path
 
@@ -61,7 +44,7 @@ def test_export_stdout_is_prov_json(tmp_path):
     assert result.exit_code == 0
     doc = json.loads(result.stdout)
     assert doc["prefix"]["ck"] == CK_NAMESPACE
-    assert doc["entity"]["ck:c1"]["prov:type"] == "ck:Claim"
+    assert doc["entity"]["ck:c1"]["prov:type"] == "ck:claim"
     assert "ck:s1" in doc["wasInfluencedBy"]
 
 
@@ -78,7 +61,7 @@ def test_export_to_file(tmp_path):
     assert result.exit_code == 0
     text = out.read_text(encoding="utf-8")
     assert text.endswith("\n")
-    assert json.loads(text)["entity"]["ck:c1"]["prov:type"] == "ck:Claim"
+    assert json.loads(text)["entity"]["ck:c1"]["prov:type"] == "ck:claim"
 
 
 def test_export_missing_file(tmp_path):

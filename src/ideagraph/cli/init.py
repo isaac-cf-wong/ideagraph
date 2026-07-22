@@ -20,7 +20,7 @@ def init_command(
         typer.Option("--force", help="Overwrite the file if it already exists."),
     ] = False,
 ) -> None:
-    """Create an empty provenance graph file.
+    """Create an empty knowledge graph file.
 
     Args:
         path: Destination graph JSON file path.
@@ -29,9 +29,9 @@ def init_command(
     """
     from logging import getLogger
 
-    from ideagraph.core import ProvenanceGraph
     from ideagraph.core.identity import SEP
-    from ideagraph.persistence import save_graph
+    from ideagraph.kg import KnowledgeGraph
+    from ideagraph.kg.persistence import save_graph
 
     logger = getLogger("ideagraph")
 
@@ -43,5 +43,5 @@ def init_command(
         typer.echo(f"Invalid --article-id {article_id!r}: must be non-empty and not contain {SEP!r}", err=True)
         raise typer.Exit(code=1)
 
-    save_graph(ProvenanceGraph(article_id=article_id), path)
-    logger.info("Initialised empty provenance graph at %s", path)
+    save_graph(KnowledgeGraph(article_id=article_id), path)
+    logger.info("Initialised empty knowledge graph at %s", path)

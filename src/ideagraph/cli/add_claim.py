@@ -12,7 +12,7 @@ from ideagraph.core import ClaimStatus
 
 
 def add_claim_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     statement: Annotated[str, typer.Argument(help="The claim statement.")],
     claim_id: Annotated[
         str | None,
@@ -39,7 +39,10 @@ def add_claim_command(
         typer.Option("--created-at", help="ISO-8601 creation timestamp (defaults to now)."),
     ] = None,
 ) -> None:
-    """Add a claim to a provenance graph and print its id.
+    """Add a claim to a knowledge graph and print its id.
+
+    A claim is a statement whose type is fixed to ``claim``; it is a convenience
+    shorthand for ``add-statement --type claim``.
 
     Args:
         path: Path to a graph JSON file produced by ideagraph.
@@ -54,8 +57,8 @@ def add_claim_command(
     from logging import getLogger
 
     from ideagraph.cli._options import merged_metadata, parse_datetime
-    from ideagraph.core import Claim
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg import Node
+    from ideagraph.kg.persistence import load_graph, save_graph
 
     logger = getLogger("ideagraph")
 
@@ -65,22 +68,29 @@ def add_claim_command(
 
     graph = load_graph(path)
 
-    if claim_id is not None and claim_id in graph.statements:
+    if claim_id is not None and claim_id in graph.nodes:
         typer.echo(f"A statement with id {claim_id} already exists", err=True)
         raise typer.Exit(code=1)
 
-    claim_tags = list(tags) if tags else []
-    claim_meta = merged_metadata(meta, meta_json)
-    claim = (
-        Claim(statement=statement, tags=claim_tags, status=status, metadata=claim_meta)
-        if claim_id is None
-        else Claim(statement=statement, id=claim_id, tags=claim_tags, status=status, metadata=claim_meta)
+    node = Node(
+        type="claim",
+        text=statement,
+        tags=list(tags) if tags else [],
+        properties={
+            "status": status.value,
+            "order": 0,
+            "section": None,
+            "source_digest": None,
+            "metadata": merged_metadata(meta, meta_json),
+        },
     )
+    if claim_id is not None:
+        node.id = claim_id
     created = parse_datetime(created_at, "--created-at")
     if created is not None:
-        claim.created_at = created
-    graph.add_claim(claim)
+        node.created_at = created
+    graph.add_node(node)
     save_graph(graph, path)
 
-    logger.info("Added claim %s to %s", claim.id, path)
-    typer.echo(claim.id)
+    logger.info("Added claim %s to %s", node.id, path)
+    typer.echo(node.id)

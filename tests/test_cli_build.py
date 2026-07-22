@@ -5,7 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -21,7 +21,7 @@ def test_init_creates_empty_graph(tmp_path):
     result = runner.invoke(app, ["init", str(path)])
     assert result.exit_code == 0
     assert path.exists()
-    assert load_graph(path).claims == {}
+    assert load_graph(path).nodes == {}
 
 
 def test_init_refuses_overwrite(tmp_path):
@@ -50,7 +50,7 @@ def test_init_force_overwrites(tmp_path):
     path.write_text("sentinel", encoding="utf-8")
     result = runner.invoke(app, ["init", str(path), "--force"])
     assert result.exit_code == 0
-    assert load_graph(path).claims == {}
+    assert load_graph(path).nodes == {}
 
 
 def test_add_claim_prints_generated_id(tmp_path):
@@ -67,7 +67,7 @@ def test_add_claim_prints_generated_id(tmp_path):
     claim_id = result.stdout.strip()
     assert len(claim_id) == 32
     graph = load_graph(path)
-    assert graph.claims[claim_id].statement == "Water boils at 100C."
+    assert graph.nodes[claim_id].text == "Water boils at 100C."
 
 
 def test_add_claim_with_id_and_tags(tmp_path):
@@ -85,8 +85,8 @@ def test_add_claim_with_id_and_tags(tmp_path):
     )
     assert result.exit_code == 0
     assert result.stdout.strip() == "c1"
-    claim = load_graph(path).claims["c1"]
-    assert claim.tags == ["phys", "thermo"]
+    node = load_graph(path).nodes["c1"]
+    assert node.tags == ["phys", "thermo"]
 
 
 def test_add_claim_duplicate_id_rejected(tmp_path):
@@ -103,7 +103,7 @@ def test_add_claim_duplicate_id_rejected(tmp_path):
     assert result.exit_code == 1
     assert "already exists" in result.stderr
     # The original claim is untouched.
-    assert load_graph(path).claims["c1"].statement == "A"
+    assert load_graph(path).nodes["c1"].text == "A"
 
 
 def test_add_claim_missing_file(tmp_path):
@@ -129,4 +129,4 @@ def test_add_claim_persists_across_calls(tmp_path):
     runner.invoke(app, ["init", str(path)])
     runner.invoke(app, ["add-claim", str(path), "A", "--id", "c1"])
     runner.invoke(app, ["add-claim", str(path), "B", "--id", "c2"])
-    assert set(load_graph(path).claims) == {"c1", "c2"}
+    assert set(load_graph(path).nodes) == {"c1", "c2"}

@@ -5,8 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import ClaimStatus
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -37,7 +36,7 @@ def test_mark_sets_status(tmp_path):
     result = runner.invoke(app, ["mark", str(path), "c1", "valid"])
     assert result.exit_code == 0
     assert result.stdout.strip() == "c1: valid"
-    assert load_graph(path).claims["c1"].status is ClaimStatus.VALID
+    assert load_graph(path).nodes["c1"].properties["status"] == "valid"
 
 
 def test_mark_records_note_in_metadata(tmp_path):
@@ -49,9 +48,9 @@ def test_mark_records_note_in_metadata(tmp_path):
     """
     path = _graph_with_claim(tmp_path / "g.json")
     runner.invoke(app, ["mark", str(path), "c1", "invalid", "--note", "reviewer disagrees"])
-    claim = load_graph(path).claims["c1"]
-    assert claim.status is ClaimStatus.INVALID
-    assert claim.metadata["review_note"] == "reviewer disagrees"
+    node = load_graph(path).nodes["c1"]
+    assert node.properties["status"] == "invalid"
+    assert node.properties["metadata"]["review_note"] == "reviewer disagrees"
 
 
 def test_mark_resolves_needs_review(tmp_path):
@@ -63,9 +62,9 @@ def test_mark_resolves_needs_review(tmp_path):
     """
     path = _graph_with_claim(tmp_path / "g.json")
     runner.invoke(app, ["mark", str(path), "c1", "needs_review"])
-    assert load_graph(path).claims["c1"].status is ClaimStatus.NEEDS_REVIEW
+    assert load_graph(path).nodes["c1"].properties["status"] == "needs_review"
     runner.invoke(app, ["mark", str(path), "c1", "valid"])
-    assert load_graph(path).claims["c1"].status is ClaimStatus.VALID
+    assert load_graph(path).nodes["c1"].properties["status"] == "valid"
 
 
 def test_mark_unknown_claim(tmp_path):

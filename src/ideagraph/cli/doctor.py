@@ -10,7 +10,7 @@ import typer
 
 
 def doctor_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     library: Annotated[
         Path | None,
         typer.Option(
@@ -26,7 +26,8 @@ def doctor_command(
 ) -> None:
     """Check a graph's integrity and report problems.
 
-    Flags cross-references from missing statements, malformed global targets,
+    Runs the ``research`` profile's structural validation plus research-level
+    checks: cross-references from missing statements, malformed global targets,
     self-references into missing local nodes, intra-article edges pointing at
     absent nodes, and outward links from a graph with no ``article_id``. Exits
     non-zero if any error is found (or any warning, with ``--strict``).
@@ -44,8 +45,10 @@ def doctor_command(
     import json as _json
     from logging import getLogger
 
-    from ideagraph.core import Diagnostic, diagnose
-    from ideagraph.persistence import load_graph
+    from ideagraph.core.identity import is_global_id, parse_global_id
+    from ideagraph.kg.persistence import load_graph
+    from ideagraph.kg.profile import Diagnostic, get_profile
+    from ideagraph.kg.profiles.research_diagnose import diagnose
 
     logger = getLogger("ideagraph")
 
@@ -64,22 +67,22 @@ def doctor_command(
             known_articles = lib.article_ids()
             library_gids = lib.statement_gids()
 
-    diagnostics = diagnose(graph, known_articles=known_articles)
+    diagnostics = get_profile("research").validate(graph)
+    diagnostics += diagnose(graph, known_articles=known_articles)
 
     # Library-level: cross target article is known but the node itself is absent.
     if library_gids is not None and graph.article_id is not None:
-        for xref in graph.cross_references.values():
-            try:
-                target_article = xref.target_article
-            except ValueError:
-                continue  # malformed target already flagged by diagnose
-            if target_article in (known_articles or set()) and xref.target not in library_gids:
+        for edge in graph.edges.values():
+            if not is_global_id(edge.target):
+                continue
+            target_article, _ = parse_global_id(edge.target)
+            if target_article in (known_articles or set()) and edge.target not in library_gids:
                 diagnostics.append(
                     Diagnostic(
                         "error",
                         "xref-dangling-target",
-                        f"cross-reference target {xref.target!r} does not exist in the library",
-                        xref.id,
+                        f"cross-reference target {edge.target!r} does not exist in the library",
+                        edge.id,
                     )
                 )
 

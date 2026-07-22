@@ -5,8 +5,8 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import Activity, ActivityKind, ProvenancePredicate
-from ideagraph.persistence import load_graph, save_graph
+from ideagraph.kg import Node
+from ideagraph.kg.persistence import load_graph, save_graph
 
 runner = CliRunner()
 
@@ -28,9 +28,7 @@ def _graph_with_nodes(path):
     runner.invoke(app, ["add-claim", str(path), "A", "--id", "c1"])
     runner.invoke(app, ["add-evidence", str(path), "c1", "--kind", "data", "--reference", "r", "--id", "e1"])
     graph = load_graph(path)
-    activity = Activity(kind=ActivityKind.COMPUTATION, label="run")
-    activity.id = "a1"
-    graph.add_activity(activity)
+    graph.add_node(Node(type="activity", text="run", id="a1", properties={"kind": "computation", "label": "run"}))
     save_graph(graph, path)
     return path
 
@@ -46,12 +44,13 @@ def test_add_relation_autodetects_types(tmp_path):
     result = runner.invoke(app, ["add-relation", str(path), "e1", "a1", "--predicate", "generated_by"])
     assert result.exit_code == 0, result.stderr
     rel_id = result.stdout.strip()
-    rel = load_graph(path).relations[rel_id]
-    assert rel.subject_id == "e1"
-    assert rel.object_id == "a1"
-    assert rel.predicate is ProvenancePredicate.GENERATED_BY
-    assert rel.subject_type.value == "evidence"
-    assert rel.object_type.value == "activity"
+    graph = load_graph(path)
+    edge = graph.edges[rel_id]
+    assert edge.source == "e1"
+    assert edge.target == "a1"
+    assert edge.type == "generated_by"
+    assert graph.nodes["e1"].type == "evidence"
+    assert graph.nodes["a1"].type == "activity"
 
 
 def test_add_relation_links_existing_evidence_to_second_claim(tmp_path):
@@ -66,8 +65,8 @@ def test_add_relation_links_existing_evidence_to_second_claim(tmp_path):
     result = runner.invoke(app, ["add-relation", str(path), "c2", "e1", "--predicate", "supported_by"])
     assert result.exit_code == 0, result.stderr
     edges = load_graph(path).outgoing("c2")
-    assert [e.object_id for e in edges] == ["e1"]
-    assert edges[0].predicate is ProvenancePredicate.SUPPORTED_BY
+    assert [e.target for e in edges] == ["e1"]
+    assert edges[0].type == "supported_by"
 
 
 def test_add_relation_explicit_type_for_unstored_endpoint(tmp_path):
@@ -83,9 +82,8 @@ def test_add_relation_explicit_type_for_unstored_endpoint(tmp_path):
         ["add-relation", str(path), "c1", "orcid:0000", "--predicate", "attributed_to", "--object-type", "agent"],
     )
     assert result.exit_code == 0, result.stderr
-    rel = load_graph(path).relations[result.stdout.strip()]
-    assert rel.object_type.value == "agent"
-    assert rel.object_id == "orcid:0000"
+    edge = load_graph(path).edges[result.stdout.strip()]
+    assert edge.target == "orcid:0000"
 
 
 def test_add_relation_undetectable_id_errors(tmp_path):

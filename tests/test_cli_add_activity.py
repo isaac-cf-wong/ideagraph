@@ -5,7 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -39,9 +39,9 @@ def test_add_activity_stores_and_prints_id(tmp_path):
     assert result.exit_code == 0
     act_id = result.stdout.strip()
     graph = load_graph(path)
-    act = graph.activities[act_id]
-    assert act.label == "reach run"
-    assert act.kind.value == "computation"
+    act = graph.nodes[act_id]
+    assert act.properties["label"] == "reach run"
+    assert act.properties["kind"] == "computation"
 
 
 def test_add_activity_honours_id_description_agent_meta(tmp_path):
@@ -73,10 +73,10 @@ def test_add_activity_honours_id_description_agent_meta(tmp_path):
         ],
     )
     assert result.stdout.strip() == "a1"
-    act = load_graph(path).activities["a1"]
-    assert act.description == "five-seed robustness"
-    assert act.agent == "cluster:lyra"
-    assert act.metadata == {"job": "1159554", "cluster": "lyra"}
+    act = load_graph(path).nodes["a1"]
+    assert act.properties["description"] == "five-seed robustness"
+    assert act.properties["agent"] == "cluster:lyra"
+    assert act.properties["metadata"] == {"job": "1159554", "cluster": "lyra"}
 
 
 def test_add_activity_bad_meta(tmp_path):

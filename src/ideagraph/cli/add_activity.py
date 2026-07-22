@@ -12,7 +12,7 @@ from ideagraph.core import ActivityKind
 
 
 def add_activity_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     label: Annotated[str, typer.Argument(help="A short human-readable name for the activity.")],
     kind: Annotated[ActivityKind, typer.Option("--kind", help="The kind of process.")],
     activity_id: Annotated[
@@ -56,11 +56,11 @@ def add_activity_command(
         typer.Option("--created-at", help="ISO-8601 creation timestamp (defaults to now)."),
     ] = None,
 ) -> None:
-    """Add an activity to a provenance graph and print its id.
+    """Add an activity to a knowledge graph and print its id.
 
     An activity records a process (a computation, measurement, analysis, or
     review) that produced or consumed artefacts. Link it to the evidence it
-    generated with ``ideagraph add-relation ... --predicate generated-by``.
+    generated with ``ideagraph add-relation ... --predicate generated_by``.
 
     Args:
         path: Path to a graph JSON file produced by ideagraph.
@@ -77,50 +77,49 @@ def add_activity_command(
         generated: Ids/references of artefacts the activity produced.
         created_at: An explicit ISO-8601 creation timestamp, or None for now.
     """
-    from datetime import datetime
     from logging import getLogger
 
     from ideagraph.cli._options import merged_metadata, parse_datetime
-    from ideagraph.core import Activity
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg import Node
+    from ideagraph.kg.persistence import load_graph, save_graph
 
     logger = getLogger("ideagraph")
-
-    def _parse_dt(value: str | None, flag: str) -> datetime | None:
-        if value is None:
-            return None
-        try:
-            return datetime.fromisoformat(value)
-        except ValueError as exc:
-            raise typer.BadParameter(f"{flag}: not an ISO-8601 timestamp: {value!r}") from exc
 
     if not path.exists():
         typer.echo(f"No such file: {path}", err=True)
         raise typer.Exit(code=1)
 
+    # Validate the timing options up front; store the raw ISO strings.
+    parse_datetime(started_at, "--started-at")
+    parse_datetime(ended_at, "--ended-at")
+
     graph = load_graph(path)
 
-    if activity_id is not None and activity_id in graph.activities:
+    if activity_id is not None and activity_id in graph.nodes:
         typer.echo(f"An activity with id {activity_id} already exists", err=True)
         raise typer.Exit(code=1)
 
-    activity = Activity(
-        kind=kind,
-        label=label,
-        description=description,
-        agent=agent,
-        started_at=_parse_dt(started_at, "--started-at"),
-        ended_at=_parse_dt(ended_at, "--ended-at"),
-        used=list(used) if used else [],
-        generated=list(generated) if generated else [],
-        metadata=merged_metadata(meta, meta_json),
+    activity = Node(
+        type="activity",
+        text=label,
+        properties={
+            "kind": kind.value,
+            "label": label,
+            "description": description,
+            "agent": agent,
+            "started_at": started_at,
+            "ended_at": ended_at,
+            "used": list(used) if used else [],
+            "generated": list(generated) if generated else [],
+            "metadata": merged_metadata(meta, meta_json),
+        },
     )
     if activity_id is not None:
         activity.id = activity_id
     created = parse_datetime(created_at, "--created-at")
     if created is not None:
         activity.created_at = created
-    graph.add_activity(activity)
+    graph.add_node(activity)
     save_graph(graph, path)
 
     logger.info("Added activity %s (%s) to %s", activity.id, kind.value, path)

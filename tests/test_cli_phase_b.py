@@ -7,7 +7,7 @@ import json
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -81,8 +81,8 @@ def test_add_xref_records_edge(tmp_path):
     runner.invoke(app, ["add-statement", str(path), "A claim.", "--id", "c1"])
     r = runner.invoke(app, ["add-xref", str(path), "c1", "cites", "goncharov2022#f3"])
     assert r.exit_code == 0, r.stderr
-    x = next(iter(load_graph(path).cross_references.values()))
-    assert x.subject_id == "c1"
+    x = next(iter(load_graph(path).edges.values()))
+    assert x.source == "c1"
     assert x.target == "goncharov2022#f3"
 
 

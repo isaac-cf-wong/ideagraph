@@ -6,7 +6,6 @@ from typer.testing import CliRunner
 
 from ideagraph import Claim, ClaimStatus, ProvenanceGraph, Statement, StatementStatus, StatementType
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
 
 runner = CliRunner()
 
@@ -70,8 +69,10 @@ def test_add_statement_cli(tmp_path):
     )
     assert r.exit_code == 0, r.stderr
     runner.invoke(app, ["add-claim", str(path), "We find Y.", "--id", "c1"])
-    g = load_graph(path)
-    assert g.statements["b1"].type is StatementType.BACKGROUND
-    assert g.statements["b1"].order == 2
-    assert g.statements["c1"].type is StatementType.CLAIM
-    assert set(g.claims) == {"c1"}
+    from ideagraph.kg.persistence import load_graph as kg_load_graph
+
+    g = kg_load_graph(path)
+    assert g.nodes["b1"].type == "background"
+    assert g.nodes["b1"].properties["order"] == 2
+    assert g.nodes["c1"].type == "claim"
+    assert {n.id for n in g.nodes.values() if n.type == "claim"} == {"c1"}

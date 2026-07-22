@@ -8,19 +8,19 @@ from typing import Annotated
 
 import typer
 
-from ideagraph.core import EvidenceKind, EvidenceRelation, ProvenancePredicate
+from ideagraph.core import EvidenceKind, EvidenceRelation
 
-#: How an evidence relation maps to the provenance edge predicate that links the
-#: claim to the evidence.
-_RELATION_TO_PREDICATE = {
-    EvidenceRelation.SUPPORTS: ProvenancePredicate.SUPPORTED_BY,
-    EvidenceRelation.REFUTES: ProvenancePredicate.REFUTED_BY,
-    EvidenceRelation.CONTEXTUAL: ProvenancePredicate.RELATES_TO,
+#: How an evidence relation maps to the edge type that links the claim to the
+#: evidence.
+_RELATION_TO_EDGE_TYPE = {
+    EvidenceRelation.SUPPORTS: "supported_by",
+    EvidenceRelation.REFUTES: "refuted_by",
+    EvidenceRelation.CONTEXTUAL: "relates_to",
 }
 
 
 def add_evidence_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     claim_id: Annotated[
         str | None,
         typer.Argument(help="Id of a claim this evidence bears on (omit to register standalone)."),
@@ -89,8 +89,10 @@ def add_evidence_command(
     from logging import getLogger
 
     from ideagraph.cli._options import merged_metadata, parse_datetime
-    from ideagraph.core import Evidence, NodeType, ProvenanceRelation, hash_file
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.core.staleness import hash_file
+    from ideagraph.kg import Edge, Node
+    from ideagraph.kg.persistence import load_graph, save_graph
+    from ideagraph.kg.profiles import STATEMENT_TYPES
 
     logger = getLogger("ideagraph")
 
@@ -109,42 +111,39 @@ def add_evidence_command(
         digest = hash_file(ref_path)
 
     graph = load_graph(path)
+    statement_types = set(STATEMENT_TYPES)
 
     # De-duplicated, order-preserving list of claims to link to (may be empty).
     targets = list(dict.fromkeys([c for c in [claim_id, *(to_claim or [])] if c]))
     for target in targets:
-        if target not in graph.statements:
+        node = graph.nodes.get(target)
+        if node is None or node.type not in statement_types:
             typer.echo(f"No such statement: {target}", err=True)
             raise typer.Exit(code=1)
-    if evidence_id is not None and evidence_id in graph.evidence:
+    if evidence_id is not None and evidence_id in graph.nodes:
         typer.echo(f"Evidence with id {evidence_id} already exists", err=True)
         raise typer.Exit(code=1)
 
-    evidence = Evidence(
-        claim_id=targets[0] if targets else "",
-        kind=kind,
-        reference=reference,
-        relation=relation,
-        description=description,
-        digest=digest,
-        metadata=merged_metadata(meta, meta_json),
+    evidence = Node(
+        type="evidence",
+        text=description,
+        properties={
+            "kind": kind.value,
+            "reference": reference,
+            "relation": relation.value,
+            "digest": digest,
+            "metadata": merged_metadata(meta, meta_json),
+        },
     )
     if evidence_id is not None:
         evidence.id = evidence_id
     created = parse_datetime(created_at, "--created-at")
     if created is not None:
         evidence.created_at = created
-    graph.add_evidence(evidence)
+    graph.add_node(evidence)
+    edge_type = _RELATION_TO_EDGE_TYPE[relation]
     for target in targets:
-        graph.add_relation(
-            ProvenanceRelation(
-                subject_type=NodeType.CLAIM,
-                subject_id=target,
-                predicate=_RELATION_TO_PREDICATE[relation],
-                object_type=NodeType.EVIDENCE,
-                object_id=evidence.id,
-            )
-        )
+        graph.add_edge(Edge(type=edge_type, source=target, target=evidence.id))
     save_graph(graph, path)
 
     linked = ", ".join(targets) if targets else "(standalone)"

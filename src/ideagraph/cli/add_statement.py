@@ -12,7 +12,7 @@ from ideagraph.core import StatementStatus, StatementType
 
 
 def add_statement_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     statement: Annotated[str, typer.Argument(help="The statement text (a block of one or more sentences).")],
     type_: Annotated[
         StatementType,
@@ -68,8 +68,8 @@ def add_statement_command(
     from logging import getLogger
 
     from ideagraph.cli._options import merged_metadata, parse_datetime
-    from ideagraph.core import Statement
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg import Node
+    from ideagraph.kg.persistence import load_graph, save_graph
 
     logger = getLogger("ideagraph")
 
@@ -79,26 +79,28 @@ def add_statement_command(
 
     graph = load_graph(path)
 
-    if statement_id is not None and statement_id in graph.statements:
+    if statement_id is not None and statement_id in graph.nodes:
         typer.echo(f"A statement with id {statement_id} already exists", err=True)
         raise typer.Exit(code=1)
 
-    node = Statement(
-        statement=statement,
-        type=type_,
-        status=status,
-        order=order,
-        section=section,
-        source_digest=source_digest,
+    node = Node(
+        type=type_.value,
+        text=statement,
         tags=list(tags) if tags else [],
-        metadata=merged_metadata(meta, meta_json),
+        properties={
+            "status": status.value,
+            "order": order,
+            "section": section,
+            "source_digest": source_digest,
+            "metadata": merged_metadata(meta, meta_json),
+        },
     )
     if statement_id is not None:
         node.id = statement_id
     created = parse_datetime(created_at, "--created-at")
     if created is not None:
         node.created_at = created
-    graph.add_statement(node)
+    graph.add_node(node)
     save_graph(graph, path)
 
     logger.info("Added %s statement %s to %s", type_.value, node.id, path)

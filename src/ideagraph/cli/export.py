@@ -24,8 +24,8 @@ def export_command(
     """
     from logging import getLogger
 
-    from ideagraph.persistence import load_graph
-    from ideagraph.prov import dumps_prov
+    from ideagraph.kg.persistence import load_graph
+    from ideagraph.kg.prov import dumps_prov
 
     logger = getLogger("ideagraph")
 

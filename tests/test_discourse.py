@@ -17,7 +17,7 @@ from ideagraph import (
     validate_all,
 )
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph, save_graph
+from ideagraph.persistence import save_graph
 
 runner = CliRunner()
 
@@ -41,8 +41,10 @@ def test_add_relation_discourse_edge(tmp_path):
     runner.invoke(app, ["add-claim", str(path), "Our claim.", "--id", "c1"])
     r = runner.invoke(app, ["add-relation", str(path), "c1", "b1", "--predicate", "elaborates"])
     assert r.exit_code == 0, r.stderr
-    edge = load_graph(path).outgoing("c1")[0]
-    assert edge.predicate is ProvenancePredicate.ELABORATES
+    from ideagraph.kg.persistence import load_graph as kg_load_graph
+
+    edge = kg_load_graph(path).outgoing("c1")[0]
+    assert edge.type == "elaborates"
 
 
 def _graph_mixed():

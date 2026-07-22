@@ -7,18 +7,9 @@ import json
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import (
-    Claim,
-    ClaimStatus,
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-    compute_digest,
-)
-from ideagraph.persistence import load_graph, save_graph
+from ideagraph.core.staleness import compute_digest
+from ideagraph.kg import Edge, KnowledgeGraph, Node
+from ideagraph.kg.persistence import load_graph, save_graph
 
 runner = CliRunner()
 
@@ -37,27 +28,16 @@ def _graph_with_file_evidence(graph_path, artefact_path, *, recorded: bytes, cur
 
     """
     artefact_path.write_bytes(current)
-    g = ProvenanceGraph()
-    g.add_claim(Claim(statement="A", id="c1", status=ClaimStatus.VALID))
-    g.add_evidence(
-        Evidence(
-            claim_id="c1",
-            kind=EvidenceKind.DATA,
-            reference=artefact_path.name,
+    g = KnowledgeGraph()
+    g.add_node(Node(type="claim", text="A", id="c1", properties={"status": "valid"}))
+    g.add_node(
+        Node(
+            type="evidence",
             id="e1",
-            digest=compute_digest(recorded),
+            properties={"kind": "data", "reference": artefact_path.name, "digest": compute_digest(recorded)},
         )
     )
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
-            id="s1",
-        )
-    )
+    g.add_edge(Edge(type="supported_by", source="c1", target="e1", id="s1"))
     save_graph(g, graph_path)
     return graph_path
 
@@ -98,7 +78,7 @@ def test_stale_apply_marks_and_persists(tmp_path):
     gp = _graph_with_file_evidence(tmp_path / "g.json", tmp_path / "a.txt", recorded=b"old", current=b"new")
     result = runner.invoke(app, ["stale", str(gp), "--base", str(tmp_path), "--apply"])
     assert result.exit_code == 0
-    assert load_graph(gp).claims["c1"].status is ClaimStatus.STALE
+    assert load_graph(gp).nodes["c1"].properties["status"] == "stale"
 
 
 def test_stale_json_output(tmp_path):

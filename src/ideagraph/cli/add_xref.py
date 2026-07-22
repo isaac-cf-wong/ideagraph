@@ -12,7 +12,7 @@ from ideagraph.core import ProvenancePredicate
 
 
 def add_xref_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file (the asserting article).")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file (the asserting article).")],
     subject_id: Annotated[str, typer.Argument(help="A local statement id this edge starts from.")],
     predicate: Annotated[
         ProvenancePredicate,
@@ -50,9 +50,10 @@ def add_xref_command(
     from logging import getLogger
 
     from ideagraph.cli._options import merged_metadata
-    from ideagraph.core import CrossReference
     from ideagraph.core.identity import is_global_id
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg import Edge
+    from ideagraph.kg.persistence import load_graph, save_graph
+    from ideagraph.kg.profiles import STATEMENT_TYPES
 
     logger = getLogger("ideagraph")
 
@@ -62,26 +63,27 @@ def add_xref_command(
 
     graph = load_graph(path)
 
-    if subject_id not in graph.statements:
+    subject = graph.nodes.get(subject_id)
+    if subject is None or subject.type not in set(STATEMENT_TYPES):
         typer.echo(f"No such statement: {subject_id}", err=True)
         raise typer.Exit(code=1)
     if not is_global_id(target):
         typer.echo(f"Invalid target {target!r}: expected a global 'article_id#node_id' address", err=True)
         raise typer.Exit(code=1)
-    if xref_id is not None and xref_id in graph.cross_references:
+    if xref_id is not None and xref_id in graph.edges:
         typer.echo(f"A cross-reference with id {xref_id} already exists", err=True)
         raise typer.Exit(code=1)
 
-    xref = CrossReference(
-        subject_id=subject_id,
-        predicate=predicate,
+    edge = Edge(
+        type=predicate.value,
+        source=subject_id,
         target=target,
-        metadata=merged_metadata(meta, meta_json),
+        properties={"metadata": merged_metadata(meta, meta_json)},
     )
     if xref_id is not None:
-        xref.id = xref_id
-    graph.add_cross_reference(xref)
+        edge.id = xref_id
+    graph.add_edge(edge)
     save_graph(graph, path)
 
-    logger.info("Added cross-reference %s: %s %s %s", xref.id, subject_id, predicate.value, target)
-    typer.echo(xref.id)
+    logger.info("Added cross-reference %s: %s %s %s", edge.id, subject_id, predicate.value, target)
+    typer.echo(edge.id)

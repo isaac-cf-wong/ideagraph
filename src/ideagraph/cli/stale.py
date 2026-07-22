@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 if TYPE_CHECKING:
-    from ideagraph.core import Evidence
+    from ideagraph.kg import Node
 
 
 def _make_resolver(base: Path):
     """Build a digest resolver that hashes evidence references as files.
 
-    Each piece of evidence's ``reference`` is treated as a path (relative to
+    Each evidence node's ``reference`` property is treated as a path (relative to
     ``base``). The file is hashed with the algorithm named in the evidence's
     recorded digest prefix (defaulting to sha256). Evidence without a recorded
     digest, or whose reference is not an existing file, resolves to ``None`` so
@@ -25,16 +25,18 @@ def _make_resolver(base: Path):
         base: Directory that relative references are resolved against.
 
     Returns:
-        A callable mapping evidence to its current digest or ``None``.
+        A callable mapping an evidence node to its current digest or ``None``.
 
     """
-    from ideagraph.core import hash_file
+    from ideagraph.core.staleness import hash_file
 
-    def _resolve(evidence: Evidence) -> str | None:
-        if evidence.digest is None:
+    def _resolve(node: Node) -> str | None:
+        digest = node.properties.get("digest")
+        if digest is None:
             return None
-        algorithm = evidence.digest.split(":", 1)[0] if ":" in evidence.digest else "sha256"
-        path = base / evidence.reference
+        algorithm = digest.split(":", 1)[0] if ":" in digest else "sha256"
+        reference = node.properties.get("reference", "")
+        path = base / reference
         if not path.is_file():
             return None
         return hash_file(path, algorithm=algorithm)
@@ -43,7 +45,7 @@ def _make_resolver(base: Path):
 
 
 def stale_command(
-    path: Annotated[Path, typer.Argument(help="Path to a provenance graph JSON file.")],
+    path: Annotated[Path, typer.Argument(help="Path to a knowledge graph JSON file.")],
     base: Annotated[
         Path | None,
         typer.Option("--base", help="Directory to resolve evidence references against (default: cwd)."),
@@ -71,8 +73,8 @@ def stale_command(
     import json
     from logging import getLogger
 
-    from ideagraph.core import find_stale_claims, mark_stale_claims
-    from ideagraph.persistence import load_graph, save_graph
+    from ideagraph.kg.persistence import load_graph, save_graph
+    from ideagraph.kg.profiles import find_stale_assertions, mark_stale
 
     logger = getLogger("ideagraph")
 
@@ -83,15 +85,15 @@ def stale_command(
     graph = load_graph(path)
     resolver = _make_resolver(base if base is not None else Path.cwd())
 
-    affected = find_stale_claims(graph, resolver)
+    affected = find_stale_assertions(graph, resolver)
     marked: list[str] = []
     if apply:
-        marked = [claim.id for claim in mark_stale_claims(graph, resolver)]
+        marked = [node.id for node in mark_stale(graph, resolver)]
         save_graph(graph, path)
         logger.info("Marked %d claim(s) stale in %s", len(marked), path)
 
     if as_json:
-        payload = {"stale": [c.id for c in affected]}
+        payload = {"stale": [node.id for node in affected]}
         if apply:
             payload["marked"] = marked
         typer.echo(json.dumps(payload, indent=2))
@@ -101,7 +103,7 @@ def stale_command(
         typer.echo("No stale claims.")
         return
 
-    for claim in affected:
-        typer.echo(f"{claim.id}: supporting evidence has changed")
+    for node in affected:
+        typer.echo(f"{node.id}: supporting evidence has changed")
     if apply:
         typer.echo(f"Marked {len(marked)} claim(s) as stale.")

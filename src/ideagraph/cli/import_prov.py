@@ -29,8 +29,8 @@ def import_command(
     """
     from logging import getLogger
 
-    from ideagraph.persistence import save_graph
-    from ideagraph.prov import loads_prov
+    from ideagraph.kg.persistence import save_graph
+    from ideagraph.kg.prov import loads_prov
 
     logger = getLogger("ideagraph")
 
@@ -44,11 +44,5 @@ def import_command(
     graph = loads_prov(source.read_text(encoding="utf-8"))
     save_graph(graph, destination)
 
-    logger.info(
-        "Imported %d claim(s), %d evidence, %d activity(ies) into %s",
-        len(graph.claims),
-        len(graph.evidence),
-        len(graph.activities),
-        destination,
-    )
+    logger.info("Imported %d node(s), %d edge(s) into %s", len(graph.nodes), len(graph.edges), destination)
     typer.echo(str(destination))

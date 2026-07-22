@@ -29,8 +29,8 @@ def coverage_command(
     import json as _json
     from logging import getLogger
 
-    from ideagraph.core import coverage as coverage_fn
-    from ideagraph.persistence import load_graph
+    from ideagraph.kg.persistence import load_graph
+    from ideagraph.kg.profiles import coverage as coverage_fn
 
     logger = getLogger("ideagraph")
 

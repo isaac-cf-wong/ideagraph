@@ -5,8 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import ProvenancePredicate
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -41,14 +40,14 @@ def test_add_evidence_links_and_prints_id(tmp_path):
     assert result.exit_code == 0
     ev_id = result.stdout.strip()
     graph = load_graph(path)
-    ev = graph.evidence[ev_id]
-    assert ev.kind.value == "data"
-    assert ev.reference == "dataset.csv"
-    assert ev.relation.value == "supports"
+    ev = graph.nodes[ev_id]
+    assert ev.properties["kind"] == "data"
+    assert ev.properties["reference"] == "dataset.csv"
+    assert ev.properties["relation"] == "supports"
     edges = graph.outgoing("c1")
     assert len(edges) == 1
-    assert edges[0].predicate is ProvenancePredicate.SUPPORTED_BY
-    assert edges[0].object_id == ev_id
+    assert edges[0].type == "supported_by"
+    assert edges[0].target == ev_id
 
 
 def test_add_evidence_refutes_uses_refuted_by(tmp_path):
@@ -64,7 +63,7 @@ def test_add_evidence_refutes_uses_refuted_by(tmp_path):
         ["add-evidence", str(path), "c1", "--kind", "data", "--reference", "r", "--relation", "refutes"],
     )
     edge = load_graph(path).outgoing("c1")[0]
-    assert edge.predicate is ProvenancePredicate.REFUTED_BY
+    assert edge.type == "refuted_by"
 
 
 def test_add_evidence_contextual_uses_relates_to(tmp_path):
@@ -80,7 +79,7 @@ def test_add_evidence_contextual_uses_relates_to(tmp_path):
         ["add-evidence", str(path), "c1", "--kind", "data", "--reference", "r", "--relation", "contextual"],
     )
     edge = load_graph(path).outgoing("c1")[0]
-    assert edge.predicate is ProvenancePredicate.RELATES_TO
+    assert edge.type == "relates_to"
 
 
 def test_add_evidence_honours_id_digest_description(tmp_path):
@@ -110,9 +109,9 @@ def test_add_evidence_honours_id_digest_description(tmp_path):
         ],
     )
     assert result.stdout.strip() == "e1"
-    ev = load_graph(path).evidence["e1"]
-    assert ev.digest == "sha256:aa"
-    assert ev.description == "the run"
+    ev = load_graph(path).nodes["e1"]
+    assert ev.properties["digest"] == "sha256:aa"
+    assert ev.text == "the run"
 
 
 def test_add_evidence_unknown_claim(tmp_path):

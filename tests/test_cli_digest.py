@@ -5,8 +5,8 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import hash_file
-from ideagraph.persistence import load_graph
+from ideagraph.core.staleness import hash_file
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -65,7 +65,7 @@ def test_add_evidence_auto_digest(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.stderr
-    assert load_graph(graph_path).evidence["e1"].digest == hash_file(artefact)
+    assert load_graph(graph_path).nodes["e1"].properties["digest"] == hash_file(artefact)
 
 
 def test_auto_digest_conflicts_with_digest(tmp_path):

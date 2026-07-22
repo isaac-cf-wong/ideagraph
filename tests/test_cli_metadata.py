@@ -5,8 +5,7 @@ from __future__ import annotations
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.core import ClaimStatus
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -50,9 +49,9 @@ def test_add_claim_status_and_meta(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.stderr
-    claim = load_graph(path).claims["c1"]
-    assert claim.status is ClaimStatus.VALID
-    assert claim.metadata == {"value": "14.8", "units": "ratio"}
+    node = load_graph(path).nodes["c1"]
+    assert node.properties["status"] == "valid"
+    assert node.properties["metadata"] == {"value": "14.8", "units": "ratio"}
 
 
 def test_add_claim_defaults_unresolved_no_meta(tmp_path):
@@ -64,9 +63,9 @@ def test_add_claim_defaults_unresolved_no_meta(tmp_path):
     """
     path = _graph(tmp_path / "g.json")
     runner.invoke(app, ["add-claim", str(path), "A", "--id", "c1"])
-    claim = load_graph(path).claims["c1"]
-    assert claim.status is ClaimStatus.UNRESOLVED
-    assert claim.metadata == {}
+    node = load_graph(path).nodes["c1"]
+    assert node.properties["status"] == "unresolved"
+    assert node.properties["metadata"] == {}
 
 
 def test_add_evidence_meta(tmp_path):
@@ -95,7 +94,7 @@ def test_add_evidence_meta(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.stderr
-    assert load_graph(path).evidence["e1"].metadata == {"run": "1159554"}
+    assert load_graph(path).nodes["e1"].properties["metadata"] == {"run": "1159554"}
 
 
 def test_bad_meta_exits_nonzero(tmp_path):

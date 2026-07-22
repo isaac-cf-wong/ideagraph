@@ -7,7 +7,7 @@ from datetime import datetime
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -37,7 +37,7 @@ def test_add_claim_created_at(tmp_path):
 
     """
     path = _graph(tmp_path / "g.json")
-    assert load_graph(path).claims["c1"].created_at == datetime.fromisoformat(WHEN)
+    assert load_graph(path).nodes["c1"].created_at == datetime.fromisoformat(WHEN)
 
 
 def test_add_evidence_and_activity_created_at(tmp_path):
@@ -57,8 +57,8 @@ def test_add_evidence_and_activity_created_at(tmp_path):
         ["add-activity", str(path), "run", "--kind", "computation", "--id", "a1", "--created-at", WHEN],
     )
     g = load_graph(path)
-    assert g.evidence["e1"].created_at == datetime.fromisoformat(WHEN)
-    assert g.activities["a1"].created_at == datetime.fromisoformat(WHEN)
+    assert g.nodes["e1"].created_at == datetime.fromisoformat(WHEN)
+    assert g.nodes["a1"].created_at == datetime.fromisoformat(WHEN)
 
 
 def test_bad_created_at(tmp_path):

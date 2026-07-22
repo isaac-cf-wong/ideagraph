@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from typer.testing import CliRunner
 
 from ideagraph.cli.main import app
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 
 runner = CliRunner()
 
@@ -57,11 +55,11 @@ def test_add_activity_timing_and_artefacts(tmp_path):
         ],
     )
     assert result.exit_code == 0, result.stderr
-    act = load_graph(path).activities["a1"]
-    assert act.started_at == datetime.fromisoformat("2026-06-13T12:00:00")
-    assert act.ended_at == datetime.fromisoformat("2026-06-13T15:06:00")
-    assert act.used == ["config.yaml"]
-    assert act.generated == ["far.npz", "table.csv"]
+    act = load_graph(path).nodes["a1"]
+    assert act.properties["started_at"] == "2026-06-13T12:00:00"
+    assert act.properties["ended_at"] == "2026-06-13T15:06:00"
+    assert act.properties["used"] == ["config.yaml"]
+    assert act.properties["generated"] == ["far.npz", "table.csv"]
 
 
 def test_add_activity_timing_optional(tmp_path):
@@ -73,11 +71,11 @@ def test_add_activity_timing_optional(tmp_path):
     """
     path = _graph(tmp_path / "g.json")
     runner.invoke(app, ["add-activity", str(path), "x", "--kind", "other", "--id", "a1"])
-    act = load_graph(path).activities["a1"]
-    assert act.started_at is None
-    assert act.ended_at is None
-    assert act.used == []
-    assert act.generated == []
+    act = load_graph(path).nodes["a1"]
+    assert act.properties["started_at"] is None
+    assert act.properties["ended_at"] is None
+    assert act.properties["used"] == []
+    assert act.properties["generated"] == []
 
 
 def test_add_activity_bad_timestamp(tmp_path):

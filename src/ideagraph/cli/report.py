@@ -24,8 +24,8 @@ def report_command(
     """
     from logging import getLogger
 
-    from ideagraph.persistence import load_graph
-    from ideagraph.reporting import render_report
+    from ideagraph.kg.persistence import load_graph
+    from ideagraph.kg.reporting import render_report
 
     logger = getLogger("ideagraph")
 
