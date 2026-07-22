@@ -23,11 +23,14 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ideagraph.core import ProvenanceGraph
-from ideagraph.core.identity import global_id
+from ideagraph.core.identity import global_id, is_global_id
 from ideagraph.core.staleness import compute_digest
-from ideagraph.persistence import load_graph
+from ideagraph.kg import KnowledgeGraph
+from ideagraph.kg.persistence import load_graph
+from ideagraph.kg.profiles import ASSERTION_TYPES, STATEMENT_TYPES
 from ideagraph.semantic import cosine, normalize, text_hash
+
+_STATEMENT_SET = frozenset(STATEMENT_TYPES)
 
 #: Default location of the index database, relative to the library root.
 DEFAULT_DB_RELPATH = ".ideagraph/index.db"
@@ -174,7 +177,7 @@ class Library:
         return out
 
     @staticmethod
-    def _read_graph(path: Path) -> ProvenanceGraph | None:
+    def _read_graph(path: Path) -> KnowledgeGraph | None:
         """Load a file as a graph, or return None if it is not one."""
         try:
             return load_graph(path)
@@ -232,35 +235,49 @@ class Library:
         # unchanged statements keep their vectors (embed() re-embeds only changed
         # text and prunes orphans whose statement no longer exists).
 
-    def _reindex_article(self, article_id: str, path: Path, graph: ProvenanceGraph, content_hash: str) -> None:
+    def _reindex_article(self, article_id: str, path: Path, graph: KnowledgeGraph, content_hash: str) -> None:
         """Replace an article's rows with a fresh index of its graph."""
         self._delete_article(article_id)
         self._conn.execute(
             "INSERT INTO articles (article_id, path, title, content_hash) VALUES (?, ?, ?, ?)",
             (article_id, str(path), graph.metadata.get("title"), content_hash),
         )
-        for node_id, s in graph.statements.items():
-            gid = global_id(article_id, node_id)
+        statement_ids = set()
+        for node in graph.nodes.values():
+            if node.type not in _STATEMENT_SET:
+                continue
+            statement_ids.add(node.id)
+            gid = global_id(article_id, node.id)
             self._conn.execute(
                 "INSERT INTO statements (gid, article_id, node_id, stype, status, section, ord, text) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (gid, article_id, node_id, s.type.value, s.status.value, s.section, s.order, s.statement),
+                (
+                    gid,
+                    article_id,
+                    node.id,
+                    node.type,
+                    node.properties.get("status", ""),
+                    node.properties.get("section"),
+                    node.properties.get("order", 0),
+                    node.text,
+                ),
             )
             self._conn.execute(
                 "INSERT INTO statements_fts (gid, article_id, text) VALUES (?, ?, ?)",
-                (gid, article_id, s.statement),
+                (gid, article_id, node.text),
             )
         insert_edge = "INSERT INTO edges (src_gid, dst_gid, predicate, kind, article_id) VALUES (?, ?, ?, ?, ?)"
-        # Idea-level intra edges: statement -> statement discourse links only.
-        for rel in graph.relations.values():
-            if rel.subject_id in graph.statements and rel.object_id in graph.statements:
-                src = global_id(article_id, rel.subject_id)
-                dst = global_id(article_id, rel.object_id)
-                self._conn.execute(insert_edge, (src, dst, rel.predicate.value, "intra", article_id))
-        for xref in graph.cross_references.values():
-            if xref.subject_id in graph.statements:
-                src = global_id(article_id, xref.subject_id)
-                self._conn.execute(insert_edge, (src, xref.target, xref.predicate.value, "cross", article_id))
+        for edge in graph.edges.values():
+            if edge.source not in statement_ids:
+                continue
+            src = global_id(article_id, edge.source)
+            if edge.target in statement_ids:
+                # Idea-level intra edge: statement -> statement (discourse links).
+                dst = global_id(article_id, edge.target)
+                self._conn.execute(insert_edge, (src, dst, edge.type, "intra", article_id))
+            elif is_global_id(edge.target):
+                # Cross-article reference: statement -> a node in another article.
+                self._conn.execute(insert_edge, (src, edge.target, edge.type, "cross", article_id))
 
     # -- queries ----------------------------------------------------------
 
@@ -297,10 +314,13 @@ class Library:
         Returns:
             The unresolved assertion statements.
         """
+        assertion_types = sorted(ASSERTION_TYPES)
+        placeholders = ", ".join("?" for _ in assertion_types)
         rows = self._conn.execute(
-            "SELECT gid, article_id, node_id, stype, text FROM statements "
-            "WHERE stype IN ('claim', 'finding', 'result') AND status = 'unresolved' "
-            "ORDER BY article_id, ord"
+            "SELECT gid, article_id, node_id, stype, text FROM statements "  # noqa: S608 - placeholders are literal "?"
+            f"WHERE stype IN ({placeholders}) AND status = 'unresolved' "
+            "ORDER BY article_id, ord",
+            (*assertion_types,),
         ).fetchall()
         return [SearchHit(r["gid"], r["article_id"], r["node_id"], r["stype"], r["text"]) for r in rows]
 
