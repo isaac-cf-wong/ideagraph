@@ -3,3 +3,6 @@ src/ideagraph/web/static/
 
 # Django templates: prettier's HTML formatter mangles {% %} template tags.
 src/ideagraph/server/web/templates/
+
+# Vendored library in the Django app static dir.
+src/ideagraph/server/web/static/web/vendor/

@@ -11,7 +11,7 @@
         <tbody>
           {% for row in rows %}
             <tr>
-              <td>{{ row.graph.title|default:row.graph.slug }}</td>
+              <td><a href="{% url 'web:graph-detail' row.graph.slug %}">{{ row.graph.title|default:row.graph.slug }}</a></td>
               <td><code>{{ row.graph.slug }}</code></td>
               <td>{{ row.graph.owner.get_username|default:"—" }}</td>
               <td><span class="role role-{{ row.role }}">{{ row.role }}</span></td>

@@ -177,3 +177,113 @@ body {
     border-radius: 0.4rem;
     font: inherit;
 }
+
+.graph-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    height: calc(100vh - 8rem);
+}
+
+.graph-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.graph-head h1 {
+    margin: 0;
+    font-size: 1.4rem;
+}
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.chip {
+    color: #fff;
+    font-size: 0.8rem;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+}
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+.legend .lg {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.legend .lg i {
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.graph-body {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    gap: 0.75rem;
+    min-height: 0;
+}
+
+.net {
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: var(--card);
+    min-height: 0;
+}
+
+.node-panel {
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    background: var(--card);
+    padding: 1rem;
+    overflow: auto;
+}
+
+.node-panel h3 {
+    margin: 0 0 0.4rem;
+    word-break: break-all;
+}
+
+.node-panel .badge {
+    color: #fff;
+    font-size: 0.75rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+}
+
+.node-panel .stmt {
+    margin: 0.6rem 0;
+}
+
+.node-panel .kv {
+    font-size: 0.9rem;
+    margin: 0.25rem 0;
+}
+
+.node-panel pre {
+    background: var(--paper);
+    padding: 0.5rem;
+    border-radius: 0.4rem;
+    overflow: auto;
+    font-size: 0.8rem;
+}
+
+.hint {
+    color: var(--muted);
+    font-size: 0.9rem;
+}

@@ -1,0 +1,23 @@
+{% extends "web/base.html" %}
+{% load static %}
+{% block title %}{{ graph.title|default:graph.slug }} · ideagraph{% endblock %}
+{% block content %}
+  <section class="graph-view" data-graph-url="{% url 'web:graph-data' graph.slug %}">
+    <div class="graph-head">
+      <div>
+        <h1>{{ graph.title|default:graph.slug }}</h1>
+        <div id="counts" class="muted"></div>
+      </div>
+      <div id="summary" class="chips"></div>
+    </div>
+    <div class="legend" id="legend"></div>
+    <div class="graph-body">
+      <div id="net" class="net"></div>
+      <aside id="panel" class="node-panel">
+        <span class="hint">Click a node to inspect it.</span>
+      </aside>
+    </div>
+  </section>
+  <script src="{% static 'web/vendor/vis-network.min.js' %}"></script>
+  <script src="{% static 'web/js/graph.js' %}"></script>
+{% endblock %}

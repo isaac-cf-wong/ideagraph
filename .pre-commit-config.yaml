@@ -1,5 +1,5 @@
-# Vendored third-party asset (minified) — skip formatting/linting/size hooks.
-exclude: '^src/ideagraph/web/static/'
+# Vendored third-party assets (minified) — skip formatting/linting/size hooks.
+exclude: '^src/ideagraph/(web/static/|server/web/static/web/vendor/)'
 
 repos:
     - repo: https://github.com/pre-commit/pre-commit-hooks

@@ -5,13 +5,38 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.core.exceptions import PermissionDenied
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
 
-from ideagraph.server.graphs.permissions import visible_graphs
+from ideagraph.server.graphs.models import Graph
+from ideagraph.server.graphs.payload import graph_payload
+from ideagraph.server.graphs.permissions import can_view, visible_graphs
 from ideagraph.version import __version__
 
 if TYPE_CHECKING:
     from django.http import HttpRequest, HttpResponse
+
+
+def _graph_for_view(request: HttpRequest, slug: str) -> Graph:
+    """Fetch a graph by slug, enforcing view permission.
+
+    Args:
+        request: The incoming request.
+        slug: The graph slug.
+
+    Returns:
+        The graph the user is allowed to view.
+
+    Raises:
+        Http404: If no graph has that slug.
+        PermissionDenied: If the user may not view it.
+
+    """
+    graph = get_object_or_404(Graph, slug=slug)
+    if not can_view(request.user, graph):
+        raise PermissionDenied
+    return graph
 
 
 def index(request: HttpRequest) -> HttpResponse:
@@ -60,3 +85,35 @@ def graphs_list(request: HttpRequest) -> HttpResponse:
     graphs = visible_graphs(request.user).select_related("owner").prefetch_related("collaborators")
     rows = [{"graph": g, "role": _role_for(request.user, g)} for g in graphs]
     return render(request, "web/graphs_list.html", {"page": "graphs", "rows": rows})
+
+
+@login_required
+def graph_detail(request: HttpRequest, slug: str) -> HttpResponse:
+    """Render the provenance-graph visualization for one stored graph.
+
+    Args:
+        request: The incoming request.
+        slug: The graph slug.
+
+    Returns:
+        The rendered graph page.
+
+    """
+    graph = _graph_for_view(request, slug)
+    return render(request, "web/graph_detail.html", {"page": "graphs", "graph": graph})
+
+
+@login_required
+def graph_data(request: HttpRequest, slug: str) -> JsonResponse:
+    """Return the visualization payload for one stored graph as JSON.
+
+    Args:
+        request: The incoming request.
+        slug: The graph slug.
+
+    Returns:
+        The graph payload (nodes/edges/summary/counts).
+
+    """
+    graph = _graph_for_view(request, slug)
+    return JsonResponse(graph_payload(graph))
