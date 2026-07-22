@@ -7,48 +7,27 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
-from ideagraph.core import (
-    CrossReference,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-    Statement,
-    StatementType,
-)
+from ideagraph.kg import Edge, KnowledgeGraph, Node
 from ideagraph.server.graphs.bridge import graph_to_orm
 
 User = get_user_model()
 
 
-def _graph_a() -> ProvenanceGraph:
+def _graph_a() -> KnowledgeGraph:
     """Graph A: two statements, one discourse edge, one resolvable + one dangling xref."""
-    g = ProvenanceGraph(article_id="a", metadata={"title": "A"})
-    g.add_statement(Statement(statement="S1.", id="s1", type=StatementType.CLAIM))
-    g.add_statement(Statement(statement="S2.", id="s2", type=StatementType.FINDING))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="s1",
-            predicate=ProvenancePredicate.ELABORATES,
-            object_type=NodeType.CLAIM,
-            object_id="s2",
-            id="r1",
-        )
-    )
-    g.add_cross_reference(
-        CrossReference(subject_id="s1", predicate=ProvenancePredicate.BUILDS_ON, target="b#t1", id="x1")
-    )
-    g.add_cross_reference(
-        CrossReference(subject_id="s2", predicate=ProvenancePredicate.BUILDS_ON, target="z#x", id="x2")
-    )
+    g = KnowledgeGraph(article_id="a", metadata={"title": "A"})
+    g.add_node(Node(type="claim", id="s1", text="S1."))
+    g.add_node(Node(type="finding", id="s2", text="S2."))
+    g.add_edge(Edge(type="elaborates", source="s1", target="s2", id="r1"))
+    g.add_edge(Edge(type="builds_on", source="s1", target="b#t1", id="x1"))
+    g.add_edge(Edge(type="builds_on", source="s2", target="z#x", id="x2"))
     return g
 
 
-def _graph_b() -> ProvenanceGraph:
+def _graph_b() -> KnowledgeGraph:
     """Graph B: a single statement that Graph A references."""
-    g = ProvenanceGraph(article_id="b", metadata={"title": "B"})
-    g.add_statement(Statement(statement="T1.", id="t1", type=StatementType.CLAIM))
+    g = KnowledgeGraph(article_id="b", metadata={"title": "B"})
+    g.add_node(Node(type="claim", id="t1", text="T1."))
     return g
 
 

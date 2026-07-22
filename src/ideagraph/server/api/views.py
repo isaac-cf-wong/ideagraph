@@ -8,7 +8,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ideagraph.core.graph import ProvenanceGraph
+from ideagraph.kg.graph import KnowledgeGraph
 from ideagraph.server.api.permissions import GraphPermission
 from ideagraph.server.api.serializers import GraphSerializer, GraphWriteSerializer
 from ideagraph.server.graphs.bridge import graph_to_orm, orm_to_graph
@@ -58,7 +58,7 @@ class GraphViewSet(viewsets.ModelViewSet):
         slug = write.validated_data["slug"]
         if Graph.objects.filter(slug=slug).exists():
             return Response({"detail": f"A graph with slug '{slug}' already exists."}, status=status.HTTP_409_CONFLICT)
-        pg = ProvenanceGraph.from_dict(write.validated_data["content"])
+        pg = KnowledgeGraph.from_dict(write.validated_data["content"])
         graph = graph_to_orm(pg, slug=slug, owner=request.user)
         return Response(GraphSerializer(graph).data, status=status.HTTP_201_CREATED)
 
@@ -78,7 +78,7 @@ class GraphViewSet(viewsets.ModelViewSet):
         content = request.data.get("content")
         if not isinstance(content, dict):
             return Response({"detail": "content must be a JSON object."}, status=status.HTTP_400_BAD_REQUEST)
-        pg = ProvenanceGraph.from_dict(content)
+        pg = KnowledgeGraph.from_dict(content)
         graph_to_orm(pg, slug=graph.slug, owner=graph.owner)
         return Response(GraphSerializer(Graph.objects.get(slug=graph.slug)).data)
 
@@ -91,7 +91,7 @@ class GraphViewSet(viewsets.ModelViewSet):
             slug: The graph slug (from the URL).
 
         Returns:
-            The graph as a ProvenanceGraph dict.
+            The graph as a KnowledgeGraph dict.
 
         """
         return Response(orm_to_graph(self.get_object()).to_dict())

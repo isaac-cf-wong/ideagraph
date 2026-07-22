@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
-from ideagraph.persistence import load_graph
+from ideagraph.kg.persistence import load_graph
 from ideagraph.server.graphs.bridge import graph_to_orm
 
 if TYPE_CHECKING:

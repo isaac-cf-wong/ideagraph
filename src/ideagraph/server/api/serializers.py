@@ -55,7 +55,7 @@ class GraphWriteSerializer(serializers.Serializer):
     content = serializers.JSONField()
 
     def validate_content(self, value: Any) -> Mapping[str, Any]:
-        """Ensure the content is a JSON object (a serialised ProvenanceGraph).
+        """Ensure the content is a JSON object (a serialised KnowledgeGraph).
 
         Args:
             value: The submitted content.

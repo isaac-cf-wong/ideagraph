@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from django.core.management.base import BaseCommand, CommandError
 
-from ideagraph.persistence import dumps_graph, save_graph
+from ideagraph.kg.persistence import dumps_graph, save_graph
 from ideagraph.server.graphs.bridge import orm_to_graph
 from ideagraph.server.graphs.models import Graph
 

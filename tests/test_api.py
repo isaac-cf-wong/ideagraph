@@ -7,37 +7,19 @@ from django.contrib.auth import get_user_model
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from ideagraph.core import (
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-    Statement,
-    StatementType,
-)
+from ideagraph.kg import Edge, KnowledgeGraph, Node
 from ideagraph.server.graphs.bridge import graph_to_orm
 from ideagraph.server.graphs.models import Graph, GraphCollaborator
 
 User = get_user_model()
 
 
-def _sample() -> ProvenanceGraph:
+def _sample() -> KnowledgeGraph:
     """Build a small graph (claim supported by evidence)."""
-    g = ProvenanceGraph(article_id="a", metadata={"title": "Demo"})
-    g.add_statement(Statement(statement="A claim.", id="c1", type=StatementType.CLAIM))
-    g.add_evidence(Evidence(claim_id="c1", kind=EvidenceKind.DATA, reference="d.csv", id="e1"))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
-            id="r1",
-        )
-    )
+    g = KnowledgeGraph(article_id="a", metadata={"title": "Demo"})
+    g.add_node(Node(type="claim", id="c1", text="A claim."))
+    g.add_node(Node(type="evidence", id="e1", properties={"kind": "data", "reference": "d.csv"}))
+    g.add_edge(Edge(type="supported_by", source="c1", target="e1", id="r1"))
     return g
 
 
@@ -97,10 +79,9 @@ def test_content_export_roundtrips(owner):
     client = APIClient()
     client.force_authenticate(owner)
     data = client.get("/api/graphs/mine/content/").json()
-    restored = ProvenanceGraph.from_dict(data)
-    assert set(restored.statements) == {"c1"}
-    assert set(restored.evidence) == {"e1"}
-    assert set(restored.relations) == {"r1"}
+    restored = KnowledgeGraph.from_dict(data)
+    assert set(restored.nodes) == {"c1", "e1"}
+    assert set(restored.edges) == {"r1"}
 
 
 def test_payload_action(owner):
@@ -136,8 +117,8 @@ def test_write_collaborator_can_replace(owner):
     GraphCollaborator.objects.create(
         graph=Graph.objects.get(slug="mine"), user=writer, role=GraphCollaborator.Role.WRITE
     )
-    smaller = ProvenanceGraph(article_id="a")
-    smaller.add_statement(Statement(statement="Only one.", id="c1"))
+    smaller = KnowledgeGraph(article_id="a")
+    smaller.add_node(Node(type="claim", id="c1", text="Only one."))
     client = APIClient()
     client.force_authenticate(writer)
     resp = client.put("/api/graphs/mine/", {"content": smaller.to_dict()}, format="json")

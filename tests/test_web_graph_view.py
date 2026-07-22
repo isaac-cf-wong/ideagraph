@@ -7,16 +7,7 @@ from django.contrib.auth import get_user_model
 from django.test import Client
 from django.urls import reverse
 
-from ideagraph.core import (
-    Evidence,
-    EvidenceKind,
-    NodeType,
-    ProvenanceGraph,
-    ProvenancePredicate,
-    ProvenanceRelation,
-    Statement,
-    StatementType,
-)
+from ideagraph.kg import Edge, KnowledgeGraph, Node
 from ideagraph.server.graphs.bridge import graph_to_orm
 
 User = get_user_model()
@@ -28,19 +19,10 @@ def _stored_graph(owner) -> None:
     Args:
         owner: The owning user.
     """
-    g = ProvenanceGraph(article_id="art1", metadata={"title": "Demo"})
-    g.add_statement(Statement(statement="A claim.", id="c1", type=StatementType.CLAIM))
-    g.add_evidence(Evidence(claim_id="c1", kind=EvidenceKind.DATA, reference="d.csv", id="e1"))
-    g.add_relation(
-        ProvenanceRelation(
-            subject_type=NodeType.CLAIM,
-            subject_id="c1",
-            predicate=ProvenancePredicate.SUPPORTED_BY,
-            object_type=NodeType.EVIDENCE,
-            object_id="e1",
-            id="r1",
-        )
-    )
+    g = KnowledgeGraph(article_id="art1", metadata={"title": "Demo"})
+    g.add_node(Node(type="claim", id="c1", text="A claim."))
+    g.add_node(Node(type="evidence", id="e1", properties={"kind": "data", "reference": "d.csv"}))
+    g.add_edge(Edge(type="supported_by", source="c1", target="e1", id="r1"))
     graph_to_orm(g, slug="demo", owner=owner)
 
 

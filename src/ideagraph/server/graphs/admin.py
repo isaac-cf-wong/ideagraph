@@ -39,8 +39,8 @@ class GraphCollaboratorAdmin(admin.ModelAdmin):
 class NodeAdmin(admin.ModelAdmin):
     """Admin for graph nodes."""
 
-    list_display = ("graph", "kind", "node_id", "stype", "status")
-    list_filter = ("kind", "stype", "status")
+    list_display = ("graph", "type", "node_id", "status")
+    list_filter = ("type", "status")
     search_fields = ("node_id", "text")
 
 
@@ -48,6 +48,6 @@ class NodeAdmin(admin.ModelAdmin):
 class EdgeAdmin(admin.ModelAdmin):
     """Admin for graph edges."""
 
-    list_display = ("graph", "edge_class", "subject_id", "predicate", "object_ref")
-    list_filter = ("edge_class", "predicate")
-    search_fields = ("subject_id", "object_ref")
+    list_display = ("graph", "type", "source", "target")
+    list_filter = ("type",)
+    search_fields = ("source", "target")
