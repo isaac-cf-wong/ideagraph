@@ -86,7 +86,9 @@ def register_commands() -> None:
     """Register CLI commands."""
     from ideagraph.cli.add_activity import add_activity_command
     from ideagraph.cli.add_claim import add_claim_command
+    from ideagraph.cli.add_edge import add_edge_command
     from ideagraph.cli.add_evidence import add_evidence_command
+    from ideagraph.cli.add_node import add_node_command
     from ideagraph.cli.add_relation import add_relation_command
     from ideagraph.cli.add_statement import add_statement_command
     from ideagraph.cli.add_xref import add_xref_command
@@ -113,6 +115,8 @@ def register_commands() -> None:
 
     app.command(name="init")(init_command)
     app.command(name="set-article")(set_article_command)
+    app.command(name="add-node")(add_node_command)
+    app.command(name="add-edge")(add_edge_command)
     app.command(name="add-statement")(add_statement_command)
     app.command(name="add-claim")(add_claim_command)
     app.command(name="add-evidence")(add_evidence_command)

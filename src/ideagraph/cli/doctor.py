@@ -100,9 +100,11 @@ def doctor_command(
         typer.Option("--strict", help="Exit non-zero on warnings too, not just errors."),
     ] = False,
     profile: Annotated[
-        str,
-        typer.Option("--profile", help="Profile to validate structure against (e.g. research, article, project)."),
-    ] = "research",
+        str | None,
+        typer.Option(
+            "--profile", help="Profile to validate structure against; defaults to the graph's recorded profile."
+        ),
+    ] = None,
 ) -> None:
     """Check a graph's integrity and report problems.
 
@@ -126,8 +128,8 @@ def doctor_command(
     import json as _json
     from logging import getLogger
 
+    from ideagraph.cli._profile import resolve_profile
     from ideagraph.kg.persistence import load_graph
-    from ideagraph.kg.profile import get_profile
     from ideagraph.kg.profiles.research_diagnose import diagnose
 
     logger = getLogger("ideagraph")
@@ -136,13 +138,8 @@ def doctor_command(
         typer.echo(f"No such file: {path}", err=True)
         raise typer.Exit(code=1)
 
-    try:
-        active_profile = get_profile(profile)
-    except KeyError:
-        typer.echo(f"Unknown profile: {profile}", err=True)
-        raise typer.Exit(code=1) from None
-
     graph = load_graph(path)
+    active_profile = resolve_profile(graph, profile)
     known_articles: set[str] | None = None
     diagnostics = active_profile.validate(graph)
 
