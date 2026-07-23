@@ -1,11 +1,12 @@
 ---
 title: Core
-description: Claims, evidence, activities, and the provenance graph.
+description:
+    The generic knowledge-graph core — Node, Edge, KnowledgeGraph, Profile.
 ---
 
 <!-- prettier-ignore-start -->
 
-::: ideagraph.core
+::: ideagraph.kg
     options:
         show_root_heading: false
         heading_level: 2

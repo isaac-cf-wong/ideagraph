@@ -5,7 +5,7 @@ description: Export to and import from W3C PROV-JSON.
 
 <!-- prettier-ignore-start -->
 
-::: ideagraph.prov
+::: ideagraph.kg.prov
     options:
         show_root_heading: false
         heading_level: 2

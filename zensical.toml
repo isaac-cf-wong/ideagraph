@@ -50,6 +50,7 @@ nav = [
   { "API" = [
     { "Overview" = "api/index.md" },
     { "Core" = "api/core.md" },
+    { "Profiles" = "api/profiles.md" },
     { "Persistence" = "api/persistence.md" },
     { "PROV-JSON" = "api/prov.md" },
     { "Reporting" = "api/reporting.md" },
