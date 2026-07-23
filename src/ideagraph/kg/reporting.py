@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
+from ideagraph.kg.profiles.research import ASSERTION_TYPES
 from ideagraph.kg.profiles.research_ops import (
     INVALID,
     NEEDS_REVIEW,
@@ -26,9 +27,6 @@ from ideagraph.kg.profiles.research_ops import (
 if TYPE_CHECKING:
     from ideagraph.kg.graph import KnowledgeGraph
     from ideagraph.kg.node import Node
-
-#: The claim node type that heads a report section.
-_CLAIM = "claim"
 
 #: Status tokens in the order they appear in the report's summary line.
 _STATUS_ORDER = (UNRESOLVED, VALID, STALE, INVALID, NEEDS_REVIEW)
@@ -56,7 +54,7 @@ def _format_evidence(node: Node) -> str:
 
 
 def render_node_report(graph: KnowledgeGraph, node_id: str) -> str:
-    """Render a Markdown report for a single claim node.
+    """Render a Markdown report for a single assertion node.
 
     Args:
         graph: The graph holding the node and its evidence.
@@ -74,7 +72,7 @@ def render_node_report(graph: KnowledgeGraph, node_id: str) -> str:
     status = str(node.properties.get("status", UNRESOLVED))
 
     lines = [
-        f"## Claim `{node.id}`",
+        f"## {node.type.title()} `{node.id}`",
         "",
         f"> {node.text}",
         "",
@@ -101,7 +99,11 @@ def render_node_report(graph: KnowledgeGraph, node_id: str) -> str:
 
 
 def render_report(graph: KnowledgeGraph) -> str:
-    """Render a Markdown report for every claim in the graph.
+    """Render a Markdown report for every assertion in the graph.
+
+    Assertions are the statement types that carry a validation status
+    (claim / finding / result); background, methods, and the like are not
+    reported here.
 
     Args:
         graph: The graph to report on.
@@ -110,19 +112,19 @@ def render_report(graph: KnowledgeGraph) -> str:
         A Markdown string.
 
     """
-    claim_ids = [n.id for n in graph.nodes.values() if n.type == _CLAIM]
+    assertion_ids = [n.id for n in graph.nodes.values() if n.type in ASSERTION_TYPES]
     lines = ["# Provenance report", ""]
 
-    counts = Counter(str(graph.nodes[cid].properties.get("status", UNRESOLVED)) for cid in claim_ids)
-    lines.append(f"{len(claim_ids)} claim(s).")
+    counts = Counter(str(graph.nodes[aid].properties.get("status", UNRESOLVED)) for aid in assertion_ids)
+    lines.append(f"{len(assertion_ids)} assertion(s).")
     if counts:
         summary = ", ".join(f"{counts[status]} {status}" for status in _STATUS_ORDER if counts[status])
         lines.append("")
         lines.append(f"Status summary: {summary}.")
     lines.append("")
 
-    for claim_id in claim_ids:
-        lines.append(render_node_report(graph, claim_id))
+    for assertion_id in assertion_ids:
+        lines.append(render_node_report(graph, assertion_id))
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
