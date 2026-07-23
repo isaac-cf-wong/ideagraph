@@ -19,6 +19,14 @@ Three profiles ship built-in, each extending the previous one:
 Validate a graph against a chosen profile with `get_profile(name).validate(g)`
 or `ideagraph doctor --profile <name>`.
 
+A project graph closes its loop with two operations: `conclusion_status(g)`
+reports whether the question is answered (a result answers it, backed by
+evidence, with every addressing hypothesis resolved), and
+`promote(g, article_id=...)` carves the project's own new knowledge into a fresh
+article graph for the cache — gated on conclusion, with edges into imported
+nodes rewired as cross-article citations. The CLI equivalent is
+`ideagraph promote` (`--check` reports status without promoting).
+
 <!-- prettier-ignore-start -->
 
 ::: ideagraph.kg.profiles
