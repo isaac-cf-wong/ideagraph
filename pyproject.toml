@@ -45,15 +45,13 @@ release = ["git-cliff>=2.13.1"]
 
 [project.scripts]
 ideagraph = "ideagraph.cli.main:app"
-# Deprecated alias for the old package name; removed in a future release.
-claimkit = "ideagraph.cli.main:app"
 
 [project.urls]
-Documentation = "https://isaac-cf-wong.github.io/claimkit"
-Source = "https://github.com/isaac-cf-wong/claimkit"
-Tracker = "https://github.com/isaac-cf-wong/claimkit/issues"
-Home = "https://github.com/isaac-cf-wong/claimkit"
-"Release Notes" = "https://github.com/isaac-cf-wong/claimkit/releases"
+Documentation = "https://isaac-cf-wong.github.io/ideagraph"
+Source = "https://github.com/isaac-cf-wong/ideagraph"
+Tracker = "https://github.com/isaac-cf-wong/ideagraph/issues"
+Home = "https://github.com/isaac-cf-wong/ideagraph"
+"Release Notes" = "https://github.com/isaac-cf-wong/ideagraph/releases"
 
 [tool.dependency-support-policy]
 # Rolling support floors (SPEC 0): runtime lower bounds are raised on a schedule
@@ -69,7 +67,7 @@ lock = "minimal"
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/ideagraph", "src/claimkit"]
+packages = ["src/ideagraph"]
 
 [tool.coverage.run]
 branch = true
