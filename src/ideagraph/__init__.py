@@ -43,9 +43,11 @@ from ideagraph.kg.persistence import (
     save_graph,
 )
 from ideagraph.kg.profiles import (
+    ARTICLE,
     ASSERTION_TYPES,
     CROSS_ARTICLE_TYPES,
     DISCOURSE_TYPES,
+    PROJECT,
     RESEARCH,
     STATEMENT_TYPES,
     ActivityKind,
@@ -71,10 +73,12 @@ from ideagraph.semantic import DEFAULT_MODEL, Embedder, SentenceTransformerEmbed
 from ideagraph.version import __version__
 
 __all__ = [
+    "ARTICLE",
     "ASSERTION_TYPES",
     "CROSS_ARTICLE_TYPES",
     "DEFAULT_MODEL",
     "DISCOURSE_TYPES",
+    "PROJECT",
     "RESEARCH",
     "SCHEMA_VERSION",
     "SEP",

@@ -8,6 +8,8 @@ here for convenience.
 
 from __future__ import annotations
 
+from ideagraph.kg.profiles.article import ARTICLE
+from ideagraph.kg.profiles.project import PROJECT
 from ideagraph.kg.profiles.research import (
     ASSERTION_TYPES,
     CROSS_ARTICLE_TYPES,
@@ -40,9 +42,11 @@ from ideagraph.kg.profiles.research_ops import (
 )
 
 __all__ = [
+    "ARTICLE",
     "ASSERTION_TYPES",
     "CROSS_ARTICLE_TYPES",
     "DISCOURSE_TYPES",
+    "PROJECT",
     "RESEARCH",
     "STATEMENT_TYPES",
     "ActivityKind",

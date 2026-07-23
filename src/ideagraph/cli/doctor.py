@@ -23,6 +23,10 @@ def doctor_command(
         bool,
         typer.Option("--strict", help="Exit non-zero on warnings too, not just errors."),
     ] = False,
+    profile: Annotated[
+        str,
+        typer.Option("--profile", help="Profile to validate structure against (e.g. research, article, project)."),
+    ] = "research",
 ) -> None:
     """Check a graph's integrity and report problems.
 
@@ -41,6 +45,7 @@ def doctor_command(
         library: Library root to resolve cross-article targets against.
         as_json: Emit the diagnostics as JSON.
         strict: Treat warnings as failures too.
+        profile: Name of the profile to validate node/edge structure against.
     """
     import json as _json
     from logging import getLogger
@@ -67,7 +72,13 @@ def doctor_command(
             known_articles = lib.article_ids()
             library_gids = lib.statement_gids()
 
-    diagnostics = get_profile("research").validate(graph)
+    try:
+        active_profile = get_profile(profile)
+    except KeyError:
+        typer.echo(f"Unknown profile: {profile}", err=True)
+        raise typer.Exit(code=1) from None
+
+    diagnostics = active_profile.validate(graph)
     diagnostics += diagnose(graph, known_articles=known_articles)
 
     # Library-level: cross target article is known but the node itself is absent.
