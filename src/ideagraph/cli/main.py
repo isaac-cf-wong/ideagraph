@@ -95,6 +95,7 @@ def register_commands() -> None:
     from ideagraph.cli.digest import digest_command
     from ideagraph.cli.doctor import doctor_command
     from ideagraph.cli.export import export_command
+    from ideagraph.cli.extract import extract_command
     from ideagraph.cli.find import find_command
     from ideagraph.cli.gaps import gaps_command
     from ideagraph.cli.import_prov import import_command
@@ -120,6 +121,7 @@ def register_commands() -> None:
     app.command(name="coverage")(coverage_command)
     app.command(name="digest")(digest_command)
     app.command(name="doctor")(doctor_command)
+    app.command(name="extract")(extract_command)
     app.command(name="index")(index_command)
     app.command(name="find")(find_command)
     app.command(name="neighbors")(neighbors_command)

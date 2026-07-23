@@ -52,6 +52,7 @@ nav = [
     { "Core" = "api/core.md" },
     { "Profiles" = "api/profiles.md" },
     { "Persistence" = "api/persistence.md" },
+    { "Extraction" = "api/extract.md" },
     { "PROV-JSON" = "api/prov.md" },
     { "Reporting" = "api/reporting.md" },
     { "Utility" = [
