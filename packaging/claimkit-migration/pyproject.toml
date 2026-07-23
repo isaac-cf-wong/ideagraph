@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "claimkit"
+version = "2.0.0"
+authors = [{ name = "Isaac C. F. Wong" }]
+description = "Deprecated: 'claimkit' was renamed to 'ideagraph'. This is a compatibility shim that installs and re-exports ideagraph."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "BSD-3-Clause"
+classifiers = [
+  "Development Status :: 7 - Inactive",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3 :: Only",
+]
+# Installing claimkit pulls in the renamed package; unpinned upper bound so a
+# fresh install always gets the latest ideagraph.
+dependencies = ["ideagraph>=2.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/isaac-cf-wong/ideagraph"
+Source = "https://github.com/isaac-cf-wong/ideagraph"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claimkit"]
