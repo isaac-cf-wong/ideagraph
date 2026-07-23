@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from ideagraph.kg.profiles.article import ARTICLE
 from ideagraph.kg.profiles.project import PROJECT
+from ideagraph.kg.profiles.project_ops import ConclusionResult, conclusion_status, promote
 from ideagraph.kg.profiles.research import (
     ASSERTION_TYPES,
     CROSS_ARTICLE_TYPES,
@@ -51,6 +52,7 @@ __all__ = [
     "STATEMENT_TYPES",
     "ActivityKind",
     "ClaimStatus",
+    "ConclusionResult",
     "Coverage",
     "DigestResolver",
     "EvidenceKind",
@@ -62,12 +64,14 @@ __all__ = [
     "ValidationResult",
     "apply_all",
     "apply_validation",
+    "conclusion_status",
     "coverage",
     "evidence_changed",
     "find_stale_assertions",
     "find_stale_evidence",
     "graph_from_legacy",
     "mark_stale",
+    "promote",
     "validate_all",
     "validate_node",
 ]

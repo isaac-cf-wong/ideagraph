@@ -104,6 +104,7 @@ def register_commands() -> None:
     from ideagraph.cli.mark import mark_command
     from ideagraph.cli.neighbors import neighbors_command
     from ideagraph.cli.path import path_command
+    from ideagraph.cli.promote import promote_command
     from ideagraph.cli.remote import remote_app
     from ideagraph.cli.report import report_command
     from ideagraph.cli.set_article import set_article_command
@@ -128,6 +129,7 @@ def register_commands() -> None:
     app.command(name="backlinks")(backlinks_command)
     app.command(name="path")(path_command)
     app.command(name="gaps")(gaps_command)
+    app.command(name="promote")(promote_command)
     app.command(name="validate")(validate_command)
     app.command(name="mark")(mark_command)
     app.command(name="stale")(stale_command)
